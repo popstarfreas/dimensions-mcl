@@ -31,6 +31,9 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.Disconnect:
                 this.handleDisconnect(server, packet);
                 break;
+            case PacketTypes.ContinueConnecting:
+                this.handleContinueConnecting(server, packet);
+                break;
             case PacketTypes.WorldInfo:
                 this.handleWorldInfo(server, packet);
                 break;
@@ -74,6 +77,31 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.UpdateItemDrop_Instanced:
                 this.handleUpdateItemDrop(server, packet);
                 break;
+            case PacketTypes.UpdatePlayer:
+            case PacketTypes.SpawnPlayer:
+            case PacketTypes.PlayerInfo:
+            case PacketTypes.PlayerActive:
+            case PacketTypes.PlayerHP:
+            case PacketTypes.TogglePVP:
+            case PacketTypes.PlayerItemAnimation:
+                this.handlePlayerPacket(server, packet);
+                break;
+
+            case PacketTypes.HealEffect:
+            case PacketTypes.PlayerMana:
+            case PacketTypes.ManaEffect:
+            case PacketTypes.PlayerTeam:
+            case PacketTypes.UpdatePlayerBuff:
+            case PacketTypes.SpecialNPCEffect:
+            case PacketTypes.PlayMusicItem:
+            case PacketTypes.PlayerDodge:
+            case PacketTypes.HealOtherPlayer:
+            case PacketTypes.PlayerTeleportThroughPortal:
+            case PacketTypes.UpdateMinionTarget:
+            case PacketTypes.NebulaLevelUpRequest:
+            case PacketTypes.MinionAttackTargetUpdate:
+                packet.data = Buffer.allocUnsafe(0);
+                break;
         }
         return handled;
     }
@@ -88,6 +116,27 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         return false;
     }
     
+    private handleContinueConnecting(server: TerrariaServer, packet: Packet): boolean {
+        const reader = new PacketReader(packet.data);
+        const playerId = reader.readByte();
+        if (playerId > 15) {
+            packet.data = new PacketWriter()
+                .setType(PacketTypes.ChatMessage)
+                .packByte(255)
+                .packColor({
+                    R: 255,
+                    G: 0,
+                    B: 0
+                })
+                .packString("Unable to join. Too many players for mobile.")
+                .data;
+            server.socket.destroy();
+            return true;
+        }
+
+        return false;
+    }
+
     private handleWorldInfo(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const time = reader.readInt32();
@@ -366,7 +415,8 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             y: reader.readSingle(),
         };
         const target = reader.readUInt16(); // -> byte
-        const flags = new BitsByte(reader.readByte());
+        const val = reader.readByte();
+        const flags = new BitsByte(val);
         const ai: number[] = [];
         for (let i = 0; i < 4; i++) {
             if (flags[i + 2]) {
@@ -407,8 +457,8 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             .packSingle(position.y)
             .packSingle(velocity.x)
             .packSingle(velocity.y)
-            .packByte(target)
-            .packByte(flags.value);
+            .packByte(target === 255 ? 16 : Math.min(15, target))
+            .packByte(val);
 
         for (let i = 0; i < 4; i++) {
             if (typeof ai[i] !== "undefined") {
@@ -416,7 +466,8 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             }
         }
         newPacket.packInt16(npcNetId);
-        if (flags[7]) {
+        if (!flags[7]) {
+            newPacket.packByte(lifeBytes as number);
             switch (lifeBytes) {
                 case 2:
                     newPacket.packInt16(life as number);
@@ -448,14 +499,18 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const flags = reader.readByte();
         const cooldownCounter = reader.readSByte();
 
-        packet.data = new PacketWriter()
-            .setType(PacketTypes.PlayerDamage)
-            .packByte(playerId)
-            .packByte(hitDirection)
-            .packInt16(damage)
-            .packString(deathReason.deathReason)
-            .packByte(flags)
-            .data;
+        if (playerId >= 16) {
+            packet.data = Buffer.allocUnsafe(0);
+        } else {
+            packet.data = new PacketWriter()
+                .setType(PacketTypes.PlayerDamage)
+                .packByte(playerId)
+                .packByte(hitDirection)
+                .packInt16(damage)
+                .packString(deathReason.deathReason)
+                .packByte(flags)
+                .data;
+        }
 
         return false;
     }
@@ -469,14 +524,18 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const hitDirection = reader.readByte();
         const flags = reader.readByte();
 
-        packet.data = new PacketWriter()
-            .setType(PacketTypes.KillMe)
-            .packByte(playerId)
-            .packByte(hitDirection)
-            .packInt16(damage)
-            .packByte(flags)
-            .packString(deathReason.deathReason)
-            .data;
+        if (playerId >= 16) {
+            packet.data = Buffer.allocUnsafe(0);
+        } else {
+            packet.data = new PacketWriter()
+                .setType(PacketTypes.KillMe)
+                .packByte(playerId)
+                .packByte(hitDirection)
+                .packInt16(damage)
+                .packByte(flags)
+                .packString(deathReason.deathReason)
+                .data;
+        }
 
         return false;
     }
@@ -504,7 +563,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const buff = reader.readByte();
         const time = reader.readInt32();
 
-        if (buff <= 190) {
+        if (buff <= 190 && playerId < 16) {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.AddPlayerBuff)
                 .packByte(playerId)
@@ -557,11 +616,17 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         if (type > 650) {
             packet.data = Buffer.allocUnsafe(0);
         }
+
+        if (owner === 255) {
+            packet.data.writeUInt8(16, reader.head - 3);
+        } else if (owner >= 16) {
+            packet.data = Buffer.allocUnsafe(0);
+        }
+
         return false;
     }
 
     private handlePlayerInventorySlot(server: TerrariaServer, packet: Packet): boolean {
-        3602
         const reader = new PacketReader(packet.data);
         const playerId = reader.readByte();
         const slotId = reader.readByte();
@@ -570,7 +635,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const netId = reader.readInt16();
 
         // 3601 is last netId on mobile (prob, I didn't check the code, just the wiki)
-        if (netId > 3601) {
+        if (netId > 3601 || playerId >= 16) {
             packet.data = Buffer.allocUnsafe(0);
         }
         return false;
@@ -592,6 +657,15 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const noDelay = reader.readByte();
         const netId = reader.readInt16();
         if (netId > 3601) {
+            packet.data = Buffer.allocUnsafe(0);
+        }
+        return false;
+    }
+
+    private handlePlayerPacket(server: TerrariaServer, packet: Packet): boolean {
+        const reader = new PacketReader(packet.data);
+        const playerId = reader.readByte();
+        if (playerId >= 16) {
             packet.data = Buffer.allocUnsafe(0);
         }
         return false;

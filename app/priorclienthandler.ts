@@ -68,7 +68,6 @@ class PriorClientHandler extends ClientPacketHandler {
         reader.readByte();
         reader.readByte();
         let message = reader.readString();
-        console.log(message);
         packet.packetType = PacketTypes.LoadNetModule;
         packet.data = new PacketWriter()
             .setType(PacketTypes.LoadNetModule)
