@@ -16,7 +16,7 @@ class MobileTranslator implements Extension {
     public clients: Set<Client> = new Set<Client>();
 
     constructor() {
-        this.name = "Mobile Translator";
+        this.name = "Mobile Compatibility Layer";
         this.version = "v1.0";
         this.author = "popstarfreas";
         this.reloadable = false;
