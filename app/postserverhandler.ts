@@ -134,6 +134,14 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             return true;
         }
 
+        const packetData = new PacketWriter()
+            .setType(PacketTypes.DimensionsUpdate)
+            .packInt16(4)
+            .packString("Terraria155")
+            .data;
+
+        server.socket.write(packetData);
+
         return false;
     }
 
