@@ -1,6 +1,4 @@
-import Client from "dimensions/client";
 import TerrariaServerPacketHandler from "dimensions/extension/terrariaserverpackethandler";
-import ListenServer from "dimensions/listenserver";
 import Packet from "dimensions/packet";
 import PacketReader from "dimensions/packets/packetreader";
 import PacketWriter from "dimensions/packets/packetwriter";
@@ -199,55 +197,53 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const sandstormSeverity = reader.readSingle();
         packet.data = new PacketWriter()
             .setType(PacketTypes.WorldInfo)
-            .packInt32(time) // 23902 vs 27000
-            .packByte(dayMoon) // 0 vs 1
-            .packByte(moonPhase) // 0 vs 0
-            .packInt16(maxTilesX) // 4200 vs 8400
-            .packInt16(maxTilesY) // 1200 vs 2400
-            .packInt16(spawnX) // 2096 vs 4227
-            .packInt16(spawnY) // 246 vs 1275
-            .packInt16(worldSurface) // 366 vs 745
-            .packInt16(rockLayer) // 480 vs 1 009
-            .packInt32(worldId) // 17169071 vs 1
-            .packString(worldName) // World 1 vs Dark Gaming - Lite
-            .packByte(moonType) // 1 vs 147
-            .packByte(treeBg) // 8 vs 134
-            .packByte(corruptBg) // 0 vs 228
-            .packByte(jungleBg) // 0 vs 29
-            .packByte(snowBg) // 32 vs 125
-            .packByte(hallowBg) // 0 vs 22
-            .packByte(crimsonBg) // 0 vs 0
-            .packByte(desertBg) // 0 vs 0
-            .packByte(oceanBg) // 2 vs 0
-            .packByte(iceBackStyle) // 2 vs 0
-            .packByte(jungleBackStyle) // 1 vs 0
-            .packByte(hellBackStyle) // 0 vs 0
-            .packSingle(windSpeed) // 0.04220030456781387 vs 0
-            .packByte(cloudNum) // 113 vs 0
-            .packInt32(tree1) // 2736 vs 0
-            .packInt32(tree2) // 4200 vs 0
-            .packInt32(tree3) // 4200 vs 0
-            .packByte(treeStyle1) // 3 vs 0
-            .packByte(treeStyle2) // 4 vs 0
-            .packByte(treeStyle3) // 0 vs 0
-            .packByte(treeStyle4) // 0 vs 0
-            .packInt32(caveBack1) // 2342 vs 0
-            .packInt32(caveBack2) // 4200 vs 0
-            .packInt32(caveBack3) // 4200 vs 0
-            .packByte(caveBackStyle1) // 6 vs 0
-            .packByte(caveBackStyle2) // 2 vs 0
-            .packByte(caveBackStyle3) // 5 vs 0
-            .packByte(caveBackStyle4) // 1 vs 0
-            .packSingle(rain) // 0.5299999713897705 vs 0
-            .packByte(eventInfo) // 0 vs 0
-            .packByte(eventInfo2) // 48 vs 0
-            .packByte(eventInfo3) // 0 vs 0
-            .packByte(eventInfo4) // 0 vs 0
-            .packByte(invasionType) // 0 vs 0
-            .packUInt64(lobbyId) // 0 vs 0
+            .packInt32(time)
+            .packByte(dayMoon)
+            .packByte(moonPhase)
+            .packInt16(maxTilesX)
+            .packInt16(maxTilesY)
+            .packInt16(spawnX)
+            .packInt16(spawnY)
+            .packInt16(worldSurface)
+            .packInt16(rockLayer)
+            .packInt32(worldId)
+            .packString(worldName)
+            .packByte(moonType)
+            .packByte(treeBg)
+            .packByte(corruptBg)
+            .packByte(jungleBg)
+            .packByte(snowBg)
+            .packByte(hallowBg)
+            .packByte(crimsonBg)
+            .packByte(desertBg)
+            .packByte(oceanBg)
+            .packByte(iceBackStyle)
+            .packByte(jungleBackStyle)
+            .packByte(hellBackStyle)
+            .packSingle(windSpeed)
+            .packByte(cloudNum)
+            .packInt32(tree1)
+            .packInt32(tree2)
+            .packInt32(tree3)
+            .packByte(treeStyle1)
+            .packByte(treeStyle2)
+            .packByte(treeStyle3)
+            .packByte(treeStyle4)
+            .packInt32(caveBack1)
+            .packInt32(caveBack2)
+            .packInt32(caveBack3)
+            .packByte(caveBackStyle1)
+            .packByte(caveBackStyle2)
+            .packByte(caveBackStyle3)
+            .packByte(caveBackStyle4)
+            .packSingle(rain)
+            .packByte(eventInfo)
+            .packByte(eventInfo2)
+            .packByte(eventInfo3)
+            .packByte(eventInfo4)
+            .packByte(invasionType)
+            .packUInt64(lobbyId)
             .data;
-
-        // packet.data = new Buffer("6300075e5d000000006810b0043008f6006e01e001affa050107576f726c6420310108000020000000020201003ada2c3d71b00a00006810000068100000030400002609000068100000681000000602050114ae073f00300000000000000000000000", "hex"); // 
         return false;
     }
     
