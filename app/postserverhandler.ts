@@ -4,7 +4,7 @@ import PacketReader from "dimensions/packets/packetreader";
 import PacketWriter from "dimensions/packets/packetwriter";
 import PacketTypes from "dimensions/packettypes";
 import TerrariaServer from "dimensions/terrariaserver";
-import Translator from ".";
+import MCL from ".";
 import ClientState from "dimensions/clientstate";
 import * as zlib from "zlib";
 import BufferReader from "dimensions/packets/bufferreader";
@@ -13,15 +13,15 @@ import PlayerDeathReason from "dimensions/datatypes/playerdeathreason";
 import TileFrameImportant from "./tileframeimportant";
 
 class PriorServerHandler extends TerrariaServerPacketHandler {
-    protected _translator: Translator;
+    protected _mcl: MCL;
 
-    constructor(translator: Translator) {
+    constructor(mcl: MCL) {
         super();
-        this._translator = translator;
+        this._mcl = mcl;
     }
 
     public handlePacket(server: TerrariaServer, packet: Packet) {
-        if (!this._translator.clients.has(server.client)) {
+        if (!this._mcl.clients.has(server.client)) {
             return false;
         }
         let handled = false;

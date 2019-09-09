@@ -1,6 +1,5 @@
 import { PacketHandler } from "dimensions/extension";
 import Translator from "./";
-import PriorServerHandler from "./postserverhandler";
 import PriorClientHandler from "./priorclienthandler";
 
 class PriorPacketHandler implements PacketHandler {

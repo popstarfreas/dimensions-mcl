@@ -5,7 +5,7 @@ import Client from "dimensions/client";
 import { Socket } from "net";
 import PostPacketHandler from "./postpackethandler";
 
-class MobileTranslator implements Extension {
+class MobileCompatibilityLayer implements Extension {
     public name: string;
     public version: string;
     public author: string;
@@ -14,6 +14,7 @@ class MobileTranslator implements Extension {
     public postPacketHandlers: PostPacketHandler;
     public listenServers: { [name: string]: ListenServer };
     public clients: Set<Client> = new Set<Client>();
+    public realId: Map<Client, number> = new Map<Client, number>(); // used when server tells mobile client their id > 15
 
     constructor() {
         this.name = "Mobile Compatibility Layer";
@@ -34,4 +35,4 @@ class MobileTranslator implements Extension {
 
 }
 
-export default MobileTranslator;
+export default MobileCompatibilityLayer;
