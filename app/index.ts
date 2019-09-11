@@ -31,6 +31,7 @@ class MobileCompatibilityLayer implements Extension {
 
     public socketClosePostHandler(socket: Socket, client: Client) {
         this.clients.delete(client);
+        this.realId.delete(client);
     }
 
 }
