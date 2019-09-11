@@ -4,18 +4,13 @@ import PacketReader from "dimensions/packets/packetreader";
 import PacketWriter from "dimensions/packets/packetwriter";
 import PacketTypes from "dimensions/packettypes";
 import TerrariaServer from "dimensions/terrariaserver";
-import MCL from ".";
+import MCL, { FAKED_CLIENT_ID, MAX_CLIENT_ID, PC_SERVER_ID, MOBILE_SERVER_ID } from ".";
 import ClientState from "dimensions/clientstate";
 import * as zlib from "zlib";
 import BufferReader from "dimensions/packets/bufferreader";
 import BitsByte from "dimensions/datatypes/bitsbyte";
 import PlayerDeathReason from "dimensions/datatypes/playerdeathreason";
 import TileFrameImportant from "./tileframeimportant";
-
-const MOBILE_SERVER_ID = 16;
-const PC_SERVER_ID = 255;
-const MAX_CLIENT_ID = 15;
-const FAKED_CLIENT_ID = 15;
 
 class PriorServerHandler extends TerrariaServerPacketHandler {
     protected _mcl: MCL;
