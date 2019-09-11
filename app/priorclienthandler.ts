@@ -4,7 +4,7 @@ import Packet from 'dimensions/packet';
 import PacketTypes from 'dimensions/packettypes';
 import PacketWriter from 'dimensions/packets/packetwriter';
 import PacketReader from 'dimensions/packets/packetreader';
-import MCL from './';
+import MCL, { MAX_CLIENT_ID } from './';
 
 class PriorClientHandler extends ClientPacketHandler {
     protected _mcl: MCL;
@@ -48,7 +48,6 @@ class PriorClientHandler extends ClientPacketHandler {
     private handleConnectRequest(client: Client, packet: Packet) {
         let reader = new PacketReader(packet.data);
         let version = reader.readString();
-        console.log("Version: "+version);
         // Mobile Version
         if (version === "Terraria155" || version === "Terraria156") {
             this._mcl.clients.add(client);
@@ -80,11 +79,15 @@ class PriorClientHandler extends ClientPacketHandler {
 
     private handlePlayerDamage(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
-        const playerId = reader.readByte();
+        let playerId = reader.readByte();
         const hitDirection = reader.readByte();
         const damage = reader.readInt16();
         const message = reader.readString();
         const flags = reader.readByte();
+        const realId = this._mcl.realId.get(client);
+        if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
+            playerId = realId;
+        }
 
         packet.data = new PacketWriter()
             .setType(PacketTypes.PlayerHurtV2)
@@ -102,11 +105,15 @@ class PriorClientHandler extends ClientPacketHandler {
 
     private handlePlayerKillMe(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
-        const playerId = reader.readByte();
+        let playerId = reader.readByte();
         const hitDirection = reader.readByte();
         const damage = reader.readInt16();
         const message = reader.readString();
         const flags = reader.readByte();
+        const realId = this._mcl.realId.get(client);
+        if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
+            playerId = realId;
+        }
 
         packet.data = new PacketWriter()
             .setType(PacketTypes.PlayerDeathV2)
@@ -123,9 +130,13 @@ class PriorClientHandler extends ClientPacketHandler {
 
     private handleAddPlayerBuff(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
-        const playerId = reader.readByte();
+        let playerId = reader.readByte();
         const buff = reader.readByte();
         const time = reader.readInt16();
+        const realId = this._mcl.realId.get(client);
+        if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
+            playerId = realId;
+        }
 
         packet.data = new PacketWriter()
             .setType(PacketTypes.AddPlayerBuff)

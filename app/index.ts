@@ -5,6 +5,11 @@ import Client from "dimensions/client";
 import { Socket } from "net";
 import PostPacketHandler from "./postpackethandler";
 
+export const MOBILE_SERVER_ID = 16;
+export const PC_SERVER_ID = 255;
+export const MAX_CLIENT_ID = 15;
+export const FAKED_CLIENT_ID = 15;
+
 class MobileCompatibilityLayer implements Extension {
     public name: string;
     public version: string;
