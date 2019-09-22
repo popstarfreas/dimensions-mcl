@@ -5,6 +5,8 @@ import PacketTypes from 'dimensions/packettypes';
 import PacketWriter from 'dimensions/packets/packetwriter';
 import PacketReader from 'dimensions/packets/packetreader';
 import MCL, { MAX_CLIENT_ID } from './';
+import BufferReader from 'dimensions/packets/bufferreader';
+import BufferWriter from 'dimensions/packets/bufferwriter';
 
 class PriorClientHandler extends ClientPacketHandler {
     protected _mcl: MCL;
@@ -40,6 +42,9 @@ class PriorClientHandler extends ClientPacketHandler {
                 break;
             case PacketTypes.AddPlayerBuff:
                 handled = this.handleAddPlayerBuff(client, packet);
+                break;
+            case PacketTypes.PlayerZone:
+                handled = this.handlePlayerZone(client, packet);
                 break;
         }
         return handled;
@@ -143,6 +148,24 @@ class PriorClientHandler extends ClientPacketHandler {
             .packByte(playerId)
             .packByte(buff)
             .packInt32(time)
+            .data;
+
+        return false;
+    }
+
+    private handlePlayerZone(client: Client, packet: Packet) {
+        const reader = new PacketReader(packet.data);
+        const playerId = reader.readByte();
+        const zone1 = reader.readByte();
+        const zone2 = reader.readByte();
+
+        packet.data = new PacketWriter()
+            .setType(PacketTypes.PlayerZone)
+            .packByte(playerId)
+            .packByte(zone1)
+            .packByte(zone2)
+            .packByte(0)
+            .packByte(0)
             .data;
 
         return false;
