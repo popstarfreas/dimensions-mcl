@@ -3,7 +3,7 @@
 Currently it's not complete. There are still issues to fix, some of which require a decision to be made on what the appropriate substitute functionality is.
 
 ## How to install
-The release zip contains a folder, put this folder into your dimensions ``build/extensions`` folder and either use the cli to reloadextensions or restart your server. The extension currently does not support reloading the extension while live, as it will cause currently connected mobile clients to stop being considered as mobile.
+The release zip contains a folder, put this folder into your dimensions ``build/extensions`` folder and either use the cli to reloadextensions or restart your dimensions server. The extension currently does not support reloading the extension while live, as it will cause currently connected mobile clients to stop being considered as mobile.
 
 ## How does it work?
 When a player first connects, their version is checked. If it matches the mobile version, the player is flagged as a mobile user and will be subject to packet rewriting by this extension. The extension intercepts incoming client packets and outgoing server packets and rewrites them to conform to the PC version (client -> server) or the mobile version (server -> client). In some cases it may not be possible to convert without losing information (such as tiles that do not exist in the client).
