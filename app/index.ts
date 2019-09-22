@@ -9,6 +9,9 @@ export const MOBILE_SERVER_ID = 16;
 export const PC_SERVER_ID = 255;
 export const MAX_CLIENT_ID = 15;
 export const FAKED_CLIENT_ID = 15;
+export const PACKET_LEN_BYTES = 2;
+export const PACKET_TYPE_BYTES = 1;
+export const PACKET_HEADER_BYTES = PACKET_LEN_BYTES + PACKET_TYPE_BYTES;
 
 class MobileCompatibilityLayer implements Extension {
     public name: string;

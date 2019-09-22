@@ -4,13 +4,34 @@ import PacketReader from "dimensions/packets/packetreader";
 import PacketWriter from "dimensions/packets/packetwriter";
 import PacketTypes from "dimensions/packettypes";
 import TerrariaServer from "dimensions/terrariaserver";
-import MCL, { FAKED_CLIENT_ID, MAX_CLIENT_ID, PC_SERVER_ID, MOBILE_SERVER_ID } from ".";
+import MCL, { FAKED_CLIENT_ID, MAX_CLIENT_ID, PC_SERVER_ID, MOBILE_SERVER_ID, PACKET_HEADER_BYTES } from ".";
 import ClientState from "dimensions/clientstate";
 import * as zlib from "zlib";
 import BufferReader from "dimensions/packets/bufferreader";
 import BitsByte from "dimensions/datatypes/bitsbyte";
 import PlayerDeathReason from "dimensions/datatypes/playerdeathreason";
 import TileFrameImportant from "./tileframeimportant";
+
+function playerIdNotMobileCompatible(playerId: number, realId: number | undefined) {
+    // If id used is the fake id, we need to use it if realId exists
+    if (playerId === FAKED_CLIENT_ID && typeof realId !== "undefined") {
+        return true;
+    }
+
+    return playerId > MAX_CLIENT_ID && realId !== playerId && playerId !== PC_SERVER_ID;
+}
+
+function shouldFakeId(playerId: number, realId: number | undefined) {
+    return playerId === realId;
+}
+
+function getPlayerId(playerId: number, realId: number | undefined) {
+    if (typeof realId === "undefined") {
+        return playerId;
+    }
+
+    return FAKED_CLIENT_ID;
+}
 
 class PriorServerHandler extends TerrariaServerPacketHandler {
     protected _mcl: MCL;
@@ -75,6 +96,9 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.UpdateItemDrop_Instanced:
                 this.handleUpdateItemDrop(server, packet);
                 break;
+            case PacketTypes.UpdateItemOwner:
+                this.handleUpdateItemOwner(server, packet);
+                break;
             case PacketTypes.UpdatePlayer:
             case PacketTypes.SpawnPlayer:
             case PacketTypes.PlayerInfo:
@@ -119,7 +143,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const playerId = reader.readByte();
         if (playerId > MAX_CLIENT_ID) {
             this._mcl.realId.set(server.client, playerId);
-            packet.data.writeUInt8(3, FAKED_CLIENT_ID); // Overwrite player id byte
+            packet.data.writeUInt8(FAKED_CLIENT_ID, 3); // Overwrite player id byte
         }
 
         const packetData = new PacketWriter()
@@ -492,14 +516,12 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const cooldownCounter = reader.readSByte();
 
         const realId = this._mcl.realId.get(server.client);
-        if (playerId > MAX_CLIENT_ID && playerId !== realId) {
-            packet.data = Buffer.allocUnsafe(0);
-        } else if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
+        if (playerIdNotMobileCompatible(playerId, realId)) {
             packet.data = Buffer.allocUnsafe(0);
         } else {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.PlayerDamage)
-                .packByte(typeof realId === "undefined" ? playerId : FAKED_CLIENT_ID)
+                .packByte(getPlayerId(playerId, realId))
                 .packByte(hitDirection)
                 .packInt16(damage)
                 .packString(deathReason.deathReason)
@@ -520,14 +542,12 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const flags = reader.readByte();
 
         const realId = this._mcl.realId.get(server.client);
-        if (playerId > MAX_CLIENT_ID && playerId !== realId) {
-            packet.data = Buffer.allocUnsafe(0);
-        } else if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
+        if (playerIdNotMobileCompatible(playerId, realId)) {
             packet.data = Buffer.allocUnsafe(0);
         } else {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.KillMe)
-                .packByte(typeof realId === "undefined" ? playerId : FAKED_CLIENT_ID)
+                .packByte(getPlayerId(playerId, realId))
                 .packByte(hitDirection)
                 .packInt16(damage)
                 .packByte(flags)
@@ -562,17 +582,15 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const time = reader.readInt32();
 
         const realId = this._mcl.realId.get(server.client);
-        if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
+        if (buff > 190 || playerIdNotMobileCompatible(playerId, realId)) {
             packet.data = Buffer.allocUnsafe(0);
-        } else if (buff <= 190 && (playerId <= MAX_CLIENT_ID || realId === playerId)) {
+        } else {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.AddPlayerBuff)
                 .packByte(typeof realId === "undefined" ? playerId : FAKED_CLIENT_ID)
                 .packByte(buff)
                 .packInt16(time) // Maybe fix this cause int32 -> int16 might not work properly
                 .data;
-        } else {
-            packet.data = Buffer.allocUnsafe(0);
         }
 
         return false;
@@ -621,12 +639,10 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const realId = this._mcl.realId.get(server.client);
         if (owner === PC_SERVER_ID) {
             packet.data.writeUInt8(MOBILE_SERVER_ID, reader.head - 3);
-        } else if (owner > MAX_CLIENT_ID && realId !== owner) {
+        } else if (playerIdNotMobileCompatible(owner, realId)) {
             packet.data = Buffer.allocUnsafe(0);
-        } else if (owner > MAX_CLIENT_ID && realId === owner) {
-            packet.data.writeUInt8(2 + 1 + 2 + 4 + 4 + 4 + 4 + 4 + 2, FAKED_CLIENT_ID); // change owner to the fake id
-        } else if (owner === MAX_CLIENT_ID && typeof realId !== "undefined") {
-            packet.data = Buffer.allocUnsafe(0);
+        } else if (shouldFakeId(owner, realId)) {
+            packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES + 2 + 4 + 4 + 4 + 4 + 4 + 2); // change owner to the fake id
         }
 
         return false;
@@ -642,12 +658,10 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
 
         const realId = this._mcl.realId.get(server.client);
         // 3601 is last netId on mobile (prob, I didn't check the code, just the wiki)
-        if (netId > 3601 || (playerId > MAX_CLIENT_ID && playerId !== realId)) {
+        if (netId > 3601 || playerIdNotMobileCompatible(playerId, realId)) {
             packet.data = Buffer.allocUnsafe(0);
-        } else if (playerId === realId) {
-            packet.data.writeUInt8(2 + 1, FAKED_CLIENT_ID);
-        } else if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
-            packet.data = Buffer.allocUnsafe(0);
+        } else if (shouldFakeId(playerId, realId)) {
+            packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES);
         }
 
         return false;
@@ -674,17 +688,29 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         return false;
     }
 
+    private handleUpdateItemOwner(server: TerrariaServer, packet: Packet) {
+        const reader = new PacketReader(packet.data);
+        const itemId = reader.readInt16();
+        const playerId = reader.readByte();
+        const realId = this._mcl.realId.get(server.client);
+
+        if (playerIdNotMobileCompatible(playerId, realId)) {
+            packet.data = Buffer.allocUnsafe(0);
+        } else if (shouldFakeId(playerId, realId)) {
+            packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES + 2);
+        } else if (playerId === PC_SERVER_ID) {
+            packet.data.writeUInt8(MOBILE_SERVER_ID, PACKET_HEADER_BYTES + 2);
+        }
+    }
+
     private handlePlayerPacket(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const playerId = reader.readByte();
         const realId = this._mcl.realId.get(server.client);
-        if (playerId > MAX_CLIENT_ID && playerId !== realId) {
+        if (playerIdNotMobileCompatible(playerId, realId)) {
             packet.data = Buffer.allocUnsafe(0);
-        } else if (playerId === realId) {
-            packet.data.writeUInt8(2 + 1, FAKED_CLIENT_ID);
-        // Cannot accept packets meant for the real player that our fake id is really assigned to
-        } else if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
-            packet.data = Buffer.allocUnsafe(0);
+        } else if (shouldFakeId(playerId, realId)) {
+            packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES);
         }
 
         return false;
