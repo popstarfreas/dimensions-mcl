@@ -22,11 +22,11 @@ class MobileCompatibilityLayer implements Extension {
     public postPacketHandlers: PostPacketHandler;
     public listenServers: { [name: string]: ListenServer };
     public clients: Set<Client> = new Set<Client>();
-    public realId: Map<Client, number> = new Map<Client, number>(); // used when server tells mobile client their id > 15
+    public realId: Map<Client, number> = new Map<Client, number>(); // used when server tells mobile client their id > MAX_CLIENT_ID
 
     constructor() {
         this.name = "Mobile Compatibility Layer";
-        this.version = "v1.0";
+        this.version = "v1.1";
         this.author = "popstarfreas";
         this.reloadable = false;
         this.priorPacketHandlers = new PriorPacketHandler(this);
