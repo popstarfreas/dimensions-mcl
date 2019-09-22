@@ -1,12 +1,10 @@
-import Client from "dimensions/client";
 import TerrariaServerPacketHandler from "dimensions/extension/terrariaserverpackethandler";
-import ListenServer from "dimensions/listenserver";
 import Packet from "dimensions/packet";
 import PacketReader from "dimensions/packets/packetreader";
 import PacketWriter from "dimensions/packets/packetwriter";
 import PacketTypes from "dimensions/packettypes";
 import TerrariaServer from "dimensions/terrariaserver";
-import Translator from ".";
+import MCL, { FAKED_CLIENT_ID, MAX_CLIENT_ID, PC_SERVER_ID, MOBILE_SERVER_ID, PACKET_HEADER_BYTES } from ".";
 import ClientState from "dimensions/clientstate";
 import * as zlib from "zlib";
 import BufferReader from "dimensions/packets/bufferreader";
@@ -14,16 +12,37 @@ import BitsByte from "dimensions/datatypes/bitsbyte";
 import PlayerDeathReason from "dimensions/datatypes/playerdeathreason";
 import TileFrameImportant from "./tileframeimportant";
 
-class PriorServerHandler extends TerrariaServerPacketHandler {
-    protected _translator: Translator;
+function playerIdNotMobileCompatible(playerId: number, realId: number | undefined) {
+    // If id used is the fake id, we need to use it if realId exists
+    if (playerId === FAKED_CLIENT_ID && typeof realId !== "undefined") {
+        return true;
+    }
 
-    constructor(translator: Translator) {
+    return playerId > MAX_CLIENT_ID && realId !== playerId && playerId !== PC_SERVER_ID;
+}
+
+function shouldFakeId(playerId: number, realId: number | undefined) {
+    return playerId === realId;
+}
+
+function getPlayerId(playerId: number, realId: number | undefined) {
+    if (typeof realId === "undefined") {
+        return playerId;
+    }
+
+    return FAKED_CLIENT_ID;
+}
+
+class PriorServerHandler extends TerrariaServerPacketHandler {
+    protected _mcl: MCL;
+
+    constructor(mcl: MCL) {
         super();
-        this._translator = translator;
+        this._mcl = mcl;
     }
 
     public handlePacket(server: TerrariaServer, packet: Packet) {
-        if (!this._translator.clients.has(server.client)) {
+        if (!this._mcl.clients.has(server.client)) {
             return false;
         }
         let handled = false;
@@ -77,6 +96,9 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.UpdateItemDrop_Instanced:
                 this.handleUpdateItemDrop(server, packet);
                 break;
+            case PacketTypes.UpdateItemOwner:
+                this.handleUpdateItemOwner(server, packet);
+                break;
             case PacketTypes.UpdatePlayer:
             case PacketTypes.SpawnPlayer:
             case PacketTypes.PlayerInfo:
@@ -119,19 +141,9 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
     private handleContinueConnecting(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const playerId = reader.readByte();
-        if (playerId > 15) {
-            packet.data = new PacketWriter()
-                .setType(PacketTypes.ChatMessage)
-                .packByte(255)
-                .packColor({
-                    R: 255,
-                    G: 0,
-                    B: 0
-                })
-                .packString("Unable to join. Too many players for mobile.")
-                .data;
-            server.socket.destroy();
-            return true;
+        if (playerId > MAX_CLIENT_ID) {
+            this._mcl.realId.set(server.client, playerId);
+            packet.data.writeUInt8(FAKED_CLIENT_ID, 3); // Overwrite player id byte
         }
 
         const packetData = new PacketWriter()
@@ -199,55 +211,53 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const sandstormSeverity = reader.readSingle();
         packet.data = new PacketWriter()
             .setType(PacketTypes.WorldInfo)
-            .packInt32(time) // 23902 vs 27000
-            .packByte(dayMoon) // 0 vs 1
-            .packByte(moonPhase) // 0 vs 0
-            .packInt16(maxTilesX) // 4200 vs 8400
-            .packInt16(maxTilesY) // 1200 vs 2400
-            .packInt16(spawnX) // 2096 vs 4227
-            .packInt16(spawnY) // 246 vs 1275
-            .packInt16(worldSurface) // 366 vs 745
-            .packInt16(rockLayer) // 480 vs 1 009
-            .packInt32(worldId) // 17169071 vs 1
-            .packString(worldName) // World 1 vs Dark Gaming - Lite
-            .packByte(moonType) // 1 vs 147
-            .packByte(treeBg) // 8 vs 134
-            .packByte(corruptBg) // 0 vs 228
-            .packByte(jungleBg) // 0 vs 29
-            .packByte(snowBg) // 32 vs 125
-            .packByte(hallowBg) // 0 vs 22
-            .packByte(crimsonBg) // 0 vs 0
-            .packByte(desertBg) // 0 vs 0
-            .packByte(oceanBg) // 2 vs 0
-            .packByte(iceBackStyle) // 2 vs 0
-            .packByte(jungleBackStyle) // 1 vs 0
-            .packByte(hellBackStyle) // 0 vs 0
-            .packSingle(windSpeed) // 0.04220030456781387 vs 0
-            .packByte(cloudNum) // 113 vs 0
-            .packInt32(tree1) // 2736 vs 0
-            .packInt32(tree2) // 4200 vs 0
-            .packInt32(tree3) // 4200 vs 0
-            .packByte(treeStyle1) // 3 vs 0
-            .packByte(treeStyle2) // 4 vs 0
-            .packByte(treeStyle3) // 0 vs 0
-            .packByte(treeStyle4) // 0 vs 0
-            .packInt32(caveBack1) // 2342 vs 0
-            .packInt32(caveBack2) // 4200 vs 0
-            .packInt32(caveBack3) // 4200 vs 0
-            .packByte(caveBackStyle1) // 6 vs 0
-            .packByte(caveBackStyle2) // 2 vs 0
-            .packByte(caveBackStyle3) // 5 vs 0
-            .packByte(caveBackStyle4) // 1 vs 0
-            .packSingle(rain) // 0.5299999713897705 vs 0
-            .packByte(eventInfo) // 0 vs 0
-            .packByte(eventInfo2) // 48 vs 0
-            .packByte(eventInfo3) // 0 vs 0
-            .packByte(eventInfo4) // 0 vs 0
-            .packByte(invasionType) // 0 vs 0
-            .packUInt64(lobbyId) // 0 vs 0
+            .packInt32(time)
+            .packByte(dayMoon)
+            .packByte(moonPhase)
+            .packInt16(maxTilesX)
+            .packInt16(maxTilesY)
+            .packInt16(spawnX)
+            .packInt16(spawnY)
+            .packInt16(worldSurface)
+            .packInt16(rockLayer)
+            .packInt32(worldId)
+            .packString(worldName)
+            .packByte(moonType)
+            .packByte(treeBg)
+            .packByte(corruptBg)
+            .packByte(jungleBg)
+            .packByte(snowBg)
+            .packByte(hallowBg)
+            .packByte(crimsonBg)
+            .packByte(desertBg)
+            .packByte(oceanBg)
+            .packByte(iceBackStyle)
+            .packByte(jungleBackStyle)
+            .packByte(hellBackStyle)
+            .packSingle(windSpeed)
+            .packByte(cloudNum)
+            .packInt32(tree1)
+            .packInt32(tree2)
+            .packInt32(tree3)
+            .packByte(treeStyle1)
+            .packByte(treeStyle2)
+            .packByte(treeStyle3)
+            .packByte(treeStyle4)
+            .packInt32(caveBack1)
+            .packInt32(caveBack2)
+            .packInt32(caveBack3)
+            .packByte(caveBackStyle1)
+            .packByte(caveBackStyle2)
+            .packByte(caveBackStyle3)
+            .packByte(caveBackStyle4)
+            .packSingle(rain)
+            .packByte(eventInfo)
+            .packByte(eventInfo2)
+            .packByte(eventInfo3)
+            .packByte(eventInfo4)
+            .packByte(invasionType)
+            .packUInt64(lobbyId)
             .data;
-
-        // packet.data = new Buffer("6300075e5d000000006810b0043008f6006e01e001affa050107576f726c6420310108000020000000020201003ada2c3d71b00a00006810000068100000030400002609000068100000681000000602050114ae073f00300000000000000000000000", "hex"); // 
         return false;
     }
     
@@ -272,7 +282,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             const color = reader.readColor();
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ChatMessage)
-                .packByte(255)
+                .packByte(PC_SERVER_ID)
                 .packByte(color.R)
                 .packByte(color.G)
                 .packByte(color.B)
@@ -326,7 +336,6 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
                     }
 
                     if (tileType > 418) {
-                        console.log(`Correcting incompatible tile type ${tileType}`);
                         let newType = 1;
                         if (TileFrameImportant[tileType]) {
                             newType = 72; // Needed so client reads tileframeimportant bytes
@@ -351,15 +360,14 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
                 }
 
                 if (tileFlags & 4) {
-                const wallId = reader.readByte(); // wall id
-                if (wallId > 224) {
-                    console.log(`Correcting incompatible wall type ${wallId}`);
-                    reader.data.writeUInt8(1, reader.head - 1);
-                }
+                    const wallId = reader.readByte(); // wall id
+                    if (wallId > 224) {
+                        reader.data.writeUInt8(1, reader.head - 1);
+                    }
 
-                if (extraFlags & 16) {
-                    reader.readByte(); // wall color
-                }
+                    if (extraFlags & 16) {
+                        reader.readByte(); // wall color
+                    }
                 }
 
                 let num6 = ((tileFlags & 24) >> 3) & 255;
@@ -465,7 +473,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             .packSingle(position.y)
             .packSingle(velocity.x)
             .packSingle(velocity.y)
-            .packByte(target === 255 ? 16 : Math.min(15, target))
+            .packByte(target === PC_SERVER_ID ? MOBILE_SERVER_ID : Math.min(MAX_CLIENT_ID, target))
             .packByte(val);
 
         for (let i = 0; i < 4; i++) {
@@ -507,12 +515,13 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const flags = reader.readByte();
         const cooldownCounter = reader.readSByte();
 
-        if (playerId >= 16) {
+        const realId = this._mcl.realId.get(server.client);
+        if (playerIdNotMobileCompatible(playerId, realId)) {
             packet.data = Buffer.allocUnsafe(0);
         } else {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.PlayerDamage)
-                .packByte(playerId)
+                .packByte(getPlayerId(playerId, realId))
                 .packByte(hitDirection)
                 .packInt16(damage)
                 .packString(deathReason.deathReason)
@@ -532,12 +541,13 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const hitDirection = reader.readByte();
         const flags = reader.readByte();
 
-        if (playerId >= 16) {
+        const realId = this._mcl.realId.get(server.client);
+        if (playerIdNotMobileCompatible(playerId, realId)) {
             packet.data = Buffer.allocUnsafe(0);
         } else {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.KillMe)
-                .packByte(playerId)
+                .packByte(getPlayerId(playerId, realId))
                 .packByte(hitDirection)
                 .packInt16(damage)
                 .packByte(flags)
@@ -556,7 +566,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
 
         packet.data = new PacketWriter()
             .setType(PacketTypes.ChatMessage)
-            .packByte(255)
+            .packByte(PC_SERVER_ID)
             .packColor(color)
             .packString(message.text)
             .data;
@@ -571,15 +581,16 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const buff = reader.readByte();
         const time = reader.readInt32();
 
-        if (buff <= 190 && playerId < 16) {
+        const realId = this._mcl.realId.get(server.client);
+        if (buff > 190 || playerIdNotMobileCompatible(playerId, realId)) {
+            packet.data = Buffer.allocUnsafe(0);
+        } else {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.AddPlayerBuff)
-                .packByte(playerId)
+                .packByte(typeof realId === "undefined" ? playerId : FAKED_CLIENT_ID)
                 .packByte(buff)
                 .packInt16(time) // Maybe fix this cause int32 -> int16 might not work properly
                 .data;
-        } else {
-            packet.data = Buffer.allocUnsafe(0);
         }
 
         return false;
@@ -625,10 +636,13 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             packet.data = Buffer.allocUnsafe(0);
         }
 
-        if (owner === 255) {
-            packet.data.writeUInt8(16, reader.head - 3);
-        } else if (owner >= 16) {
+        const realId = this._mcl.realId.get(server.client);
+        if (owner === PC_SERVER_ID) {
+            packet.data.writeUInt8(MOBILE_SERVER_ID, reader.head - 3);
+        } else if (playerIdNotMobileCompatible(owner, realId)) {
             packet.data = Buffer.allocUnsafe(0);
+        } else if (shouldFakeId(owner, realId)) {
+            packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES + 2 + 4 + 4 + 4 + 4 + 4 + 2); // change owner to the fake id
         }
 
         return false;
@@ -642,10 +656,14 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const prefix = reader.readByte();
         const netId = reader.readInt16();
 
+        const realId = this._mcl.realId.get(server.client);
         // 3601 is last netId on mobile (prob, I didn't check the code, just the wiki)
-        if (netId > 3601 || playerId >= 16) {
+        if (netId > 3601 || playerIdNotMobileCompatible(playerId, realId)) {
             packet.data = Buffer.allocUnsafe(0);
+        } else if (shouldFakeId(playerId, realId)) {
+            packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES);
         }
+
         return false;
     }
 
@@ -670,12 +688,31 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         return false;
     }
 
+    private handleUpdateItemOwner(server: TerrariaServer, packet: Packet) {
+        const reader = new PacketReader(packet.data);
+        const itemId = reader.readInt16();
+        const playerId = reader.readByte();
+        const realId = this._mcl.realId.get(server.client);
+
+        if (playerIdNotMobileCompatible(playerId, realId)) {
+            packet.data = Buffer.allocUnsafe(0);
+        } else if (shouldFakeId(playerId, realId)) {
+            packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES + 2);
+        } else if (playerId === PC_SERVER_ID) {
+            packet.data.writeUInt8(MOBILE_SERVER_ID, PACKET_HEADER_BYTES + 2);
+        }
+    }
+
     private handlePlayerPacket(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const playerId = reader.readByte();
-        if (playerId >= 16) {
+        const realId = this._mcl.realId.get(server.client);
+        if (playerIdNotMobileCompatible(playerId, realId)) {
             packet.data = Buffer.allocUnsafe(0);
+        } else if (shouldFakeId(playerId, realId)) {
+            packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES);
         }
+
         return false;
     }
 }

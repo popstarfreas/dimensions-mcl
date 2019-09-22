@@ -5,7 +5,15 @@ import Client from "dimensions/client";
 import { Socket } from "net";
 import PostPacketHandler from "./postpackethandler";
 
-class MobileTranslator implements Extension {
+export const MOBILE_SERVER_ID = 16;
+export const PC_SERVER_ID = 255;
+export const MAX_CLIENT_ID = 15;
+export const FAKED_CLIENT_ID = 15;
+export const PACKET_LEN_BYTES = 2;
+export const PACKET_TYPE_BYTES = 1;
+export const PACKET_HEADER_BYTES = PACKET_LEN_BYTES + PACKET_TYPE_BYTES;
+
+class MobileCompatibilityLayer implements Extension {
     public name: string;
     public version: string;
     public author: string;
@@ -14,6 +22,7 @@ class MobileTranslator implements Extension {
     public postPacketHandlers: PostPacketHandler;
     public listenServers: { [name: string]: ListenServer };
     public clients: Set<Client> = new Set<Client>();
+    public realId: Map<Client, number> = new Map<Client, number>(); // used when server tells mobile client their id > 15
 
     constructor() {
         this.name = "Mobile Compatibility Layer";
@@ -30,8 +39,9 @@ class MobileTranslator implements Extension {
 
     public socketClosePostHandler(socket: Socket, client: Client) {
         this.clients.delete(client);
+        this.realId.delete(client);
     }
 
 }
 
-export default MobileTranslator;
+export default MobileCompatibilityLayer;
