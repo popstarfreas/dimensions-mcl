@@ -99,6 +99,9 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.UpdateItemOwner:
                 this.handleUpdateItemOwner(server, packet);
                 break;
+            case PacketTypes.CompleteConnectionAndSpawn:
+                this.handleCompleteConnectionAndSpawn(server, packet);
+                break;
             case PacketTypes.UpdatePlayer:
             case PacketTypes.SpawnPlayer:
             case PacketTypes.PlayerInfo:
@@ -137,7 +140,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             .data;
         return false;
     }
-    
+
     private handleContinueConnecting(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const playerId = reader.readByte();
@@ -260,19 +263,19 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             .data;
         return false;
     }
-    
+
     private handleStatus(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
-        const statusMax = reader.readInt32(); 
-        const netText = reader.readNetworkText(); 
-        packet.data = new PacketWriter() 
-            .setType(PacketTypes.Status) 
+        const statusMax = reader.readInt32();
+        const netText = reader.readNetworkText();
+        packet.data = new PacketWriter()
+            .setType(PacketTypes.Status)
             .packInt32(statusMax)
             .packString(netText.text)
             .data;
         return false;
     }
-    
+
     private handleLoadNetModule(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const moduleId = reader.readUInt16();
@@ -396,13 +399,13 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             .data
     }
 
-    
+
     private handleSendSection(server: TerrariaServer, packet: Packet): boolean {
         packet.data = this.fixSendSection(packet.data);
         return false;
     }
 
-    
+
     private handleSendTileSquare(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const num21 = reader.readUInt16();
@@ -505,7 +508,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         return false;
     }
 
-    
+
     private handlePlayerHurt(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const playerId = reader.readByte();
@@ -532,7 +535,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         return false;
     }
 
-    
+
     private handlePlayerDeath(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const playerId = reader.readByte();
@@ -558,7 +561,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         return false;
     }
 
-    
+
     private handleSmartChatMessage(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const color = reader.readColor();
@@ -574,7 +577,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         return false;
     }
 
-    
+
     private handleAddPlayerBuff(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const playerId = reader.readByte();
@@ -596,7 +599,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         return false;
     }
 
-    
+
     private handleCreateCombatTextString(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const x = reader.readSingle();
@@ -712,6 +715,19 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         } else if (shouldFakeId(playerId, realId)) {
             packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES);
         }
+
+        return false;
+    }
+
+    private handleCompleteConnectionAndSpawn(server: TerrariaServer, packet: Packet): boolean {
+        // Patch TShock SSC so that args.Player.IgnoreSSCPackets is false,
+        // this allows mobile clients to send inventory changes without them getting reverted
+        server.socket.write(new PacketWriter()
+            .setType(PacketTypes.UpdateItemOwner)
+            .packInt16(400)
+            .packByte(255)
+            .data
+        );
 
         return false;
     }

@@ -4,7 +4,7 @@ import Packet from 'dimensions/packet';
 import PacketTypes from 'dimensions/packettypes';
 import PacketWriter from 'dimensions/packets/packetwriter';
 import PacketReader from 'dimensions/packets/packetreader';
-import MCL, { MAX_CLIENT_ID } from './';
+import MCL, { MAX_CLIENT_ID, MOBILE_SERVER_ID, PC_SERVER_ID } from './';
 import BufferReader from 'dimensions/packets/bufferreader';
 import BufferWriter from 'dimensions/packets/bufferwriter';
 
@@ -46,8 +46,21 @@ class PriorClientHandler extends ClientPacketHandler {
             case PacketTypes.PlayerZone:
                 handled = this.handlePlayerZone(client, packet);
                 break;
+            case PacketTypes.UpdateItemOwner:
+                this.handleUpdateItemOwner(client, packet);
+                break;
         }
         return handled;
+    }
+
+    private handleUpdateItemOwner(client, packet) {
+        const reader = new PacketReader(packet.data);
+        const itemId = reader.readInt16();
+        const owner = reader.readByte();
+
+        if (owner === MOBILE_SERVER_ID) {
+            packet.data.writeUInt8(PC_SERVER_ID, 2);
+        }
     }
 
     private handleConnectRequest(client: Client, packet: Packet) {
