@@ -725,7 +725,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         server.socket.write(new PacketWriter()
             .setType(PacketTypes.UpdateItemOwner)
             .packInt16(400)
-            .packByte(255)
+            .packByte(PC_SERVER_ID)
             .data
         );
 
