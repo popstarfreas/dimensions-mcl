@@ -11,7 +11,26 @@ import BufferReader from "dimensions/packets/bufferreader";
 import BitsByte from "dimensions/datatypes/bitsbyte";
 import PlayerDeathReason from "dimensions/datatypes/playerdeathreason";
 import TileFrameImportant from "./tileframeimportant";
+import Point from "dimensions/point";
 
+function fromBitFlags(flags: [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]): number {
+    return (flags[0] ? 1 : 0)
+         | (flags[1] ? 2 : 0)
+         | (flags[2] ? 4 : 0)
+         | (flags[3] ? 8 : 0)
+         | (flags[4] ? 16 : 0)
+         | (flags[5] ? 32 : 0)
+         | (flags[6] ? 64 : 0)
+         | (flags[7] ? 128 : 0)
+}
+
+/**
+ * 
+ * @param playerId The player id given in the packet
+ * @param realId The real id of the current client
+ * @returns true if either it is the client id we're faking to the mobile client because theirs is too large on the server, or
+ *          if the id is out of the mobile client range
+ */
 function playerIdNotMobileCompatible(playerId: number, realId: number | undefined) {
     // If id used is the fake id, we need to use it if realId exists
     if (playerId === FAKED_CLIENT_ID && typeof realId !== "undefined") {
@@ -21,15 +40,32 @@ function playerIdNotMobileCompatible(playerId: number, realId: number | undefine
     return playerId > MAX_CLIENT_ID && realId !== playerId && playerId !== PC_SERVER_ID;
 }
 
+/**
+ * 
+ * @param playerId 
+ * @param realId 
+ * @returns true if it is for the mobile client, but their assigned id is outside the mobile compatible range
+ */
 function shouldFakeId(playerId: number, realId: number | undefined) {
     return playerId === realId;
 }
 
-function getPlayerId(playerId: number, realId: number | undefined) {
-    if (typeof realId === "undefined") {
+/**
+ * 
+ * @param playerId Assumed to be mobile compatible
+ * @param realId 
+ * @returns the mobile client's local player id
+ */
+function getPlayerId(playerId: number) {
+    if (playerId < FAKED_CLIENT_ID) {
         return playerId;
     }
 
+    if (playerId === PC_SERVER_ID) {
+        return MOBILE_SERVER_ID;
+    }
+
+    // Assuming that playerId is compatible, this means it won't be >= FAKED_CLIENT_ID unless it is for the mobile client
     return FAKED_CLIENT_ID;
 }
 
@@ -94,29 +130,37 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
                 break;
             case PacketTypes.UpdateItemDrop:
             case PacketTypes.UpdateItemDrop_Instanced:
-                this.handleUpdateItemDrop(server, packet);
+                handled = this.handleUpdateItemDrop(server, packet);
                 break;
             case PacketTypes.UpdateItemOwner:
                 this.handleUpdateItemOwner(server, packet);
                 break;
             case PacketTypes.CompleteConnectionAndSpawn:
-                this.handleCompleteConnectionAndSpawn(server, packet);
+                handled = this.handleCompleteConnectionAndSpawn(server, packet);
+                break;
+            case PacketTypes.SpawnPlayer:
+                handled = this.handleSpawnPlayer(server, packet);
                 break;
             case PacketTypes.UpdatePlayer:
-            case PacketTypes.SpawnPlayer:
+                handled = this.handleUpdatePlayer(server, packet);
+                break;
             case PacketTypes.PlayerInfo:
+                handled = this.handlePlayerInfo(server, packet);
+                break;
             case PacketTypes.PlayerActive:
             case PacketTypes.PlayerHP:
             case PacketTypes.TogglePVP:
             case PacketTypes.PlayerItemAnimation:
-                this.handlePlayerPacket(server, packet);
+                handled = this.handlePlayerPacket(server, packet);
                 break;
 
+            case PacketTypes.UpdatePlayerBuff:
+                handled = this.handleUpdatePlayerBuff(server, packet);
+                break;
             case PacketTypes.HealEffect:
             case PacketTypes.PlayerMana:
             case PacketTypes.ManaEffect:
             case PacketTypes.PlayerTeam:
-            case PacketTypes.UpdatePlayerBuff:
             case PacketTypes.SpecialNPCEffect:
             case PacketTypes.PlayMusicItem:
             case PacketTypes.PlayerDodge:
@@ -126,6 +170,10 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.NebulaLevelUpRequest:
             case PacketTypes.MinionAttackTargetUpdate:
                 packet.data = Buffer.allocUnsafe(0);
+                handled = true;
+                break;
+            case PacketTypes.AddNPCBuff:
+                handled = this.handleAddNpcBuff(server, packet);
                 break;
         }
         return handled;
@@ -162,82 +210,114 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
 
     private handleWorldInfo(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
-        const time = reader.readInt32();
-        const dayMoon = reader.readByte();
-        const moonPhase = reader.readByte();
-        const maxTilesX = reader.readInt16();
-        const maxTilesY = reader.readInt16();
-        const spawnX = reader.readInt16();
-        const spawnY = reader.readInt16();
-        const worldSurface = reader.readInt16();
-        const rockLayer = reader.readInt16();
-        const worldId = reader.readInt32();
-        const worldName = reader.readString();
-        const worldUId = reader.readBytes(16);
-        const worldGenVer = reader.readUInt64();
-        const moonType = reader.readByte();
-        const treeBg = reader.readByte();
-        const corruptBg = reader.readByte();
-        const jungleBg = reader.readByte();
-        const snowBg = reader.readByte();
-        const hallowBg = reader.readByte();
-        const crimsonBg = reader.readByte();
-        const desertBg = reader.readByte();
-        const oceanBg = reader.readByte();
-        const iceBackStyle = reader.readByte();
-        const jungleBackStyle = reader.readByte();
-        const hellBackStyle = reader.readByte();
-        const windSpeed = reader.readSingle();
-        const cloudNum = reader.readByte();
-        const tree1 = reader.readInt32();
-        const tree2 = reader.readInt32();
-        const tree3 = reader.readInt32();
-        const treeStyle1 = reader.readByte();
-        const treeStyle2 = reader.readByte();
-        const treeStyle3 = reader.readByte();
-        const treeStyle4 = reader.readByte();
-        const caveBack1 = reader.readInt32();
-        const caveBack2 = reader.readInt32();
-        const caveBack3 = reader.readInt32();
-        const caveBackStyle1 = reader.readByte();
-        const caveBackStyle2 = reader.readByte();
-        const caveBackStyle3 = reader.readByte();
-        const caveBackStyle4 = reader.readByte();
-        const rain = reader.readSingle();
-        const eventInfo = reader.readByte();
-        const eventInfo2 = reader.readByte();
-        const eventInfo3 = reader.readByte();
-        const eventInfo4 = reader.readByte();
-        const eventInfo5 = reader.readByte();
-        const invasionType = reader.readSByte();
+        const time = reader.readInt32(); // Time
+        const dayAndMoon = reader.readByte(); // Day&MoonInfo
+        const moonPhase = reader.readByte(); // Moon Phase
+        const maxTiles: Point = {
+            x: reader.readInt16(),
+            y: reader.readInt16(),
+        };
+        const spawn: Point = {
+            x: reader.readInt16(),
+            y: reader.readInt16()
+        };
+        const worldSurface = reader.readInt16(); // WorldSurface
+        const rockLayer = reader.readInt16(); // RockLayer
+        const worldId = reader.readInt32(); // WorldID
+        const worldName = reader.readString(); // World Name
+        const gamemode = reader.readByte(); // Gamemode
+        const worldUid = reader.readBytes(16); // World Unique ID
+        const worldGenVersion = reader.readUInt64(); // World Generator Version
+        const moonType = reader.readByte(); // Moon Type
+        const treeBackgroud1 = reader.readByte(); // Tree Background
+        const treeBackgroud2 = reader.readByte(); // Tree Background 2
+        const treeBackgroud3 = reader.readByte(); // Tree Background 3
+        const treeBackgroud4 = reader.readByte(); // Tree Background 4
+        const corruptionBackground = reader.readByte(); // Corruption Background
+        const jungleBackground = reader.readByte(); // Jungle Background
+        const snowBackground = reader.readByte(); // Snow Background
+        const hallowBackground = reader.readByte(); // Hallow Background
+        const crimsonBackground = reader.readByte(); // Crimson Background
+        const desertBackground = reader.readByte(); // Desert Background
+        const oceanBackground = reader.readByte(); // Ocean Background
+        const mushroomBackground = reader.readByte(); // Mushroom Background
+        const underworldBackground = reader.readByte(); // Underworld Background
+        const iceBackStyle = reader.readByte(); // Ice Back Style
+        const jungleBackStyle = reader.readByte(); // Jungle Back Style
+        const hellBackStyle = reader.readByte(); // Hell Back Style
+        const windSpeedSet = reader.readSingle(); // Wind Speed Set
+        const cloudNum = reader.readByte(); // Cloud Number
+        const tree1 = reader.readInt32(); // Tree 1
+        const tree2 = reader.readInt32(); // Tree 2
+        const tree3 = reader.readInt32(); // Tree 3
+        const treeStyle1 = reader.readByte(); // Tree Style 1
+        const treeStyle2 = reader.readByte(); // Tree Style 2
+        const treeStyle3 = reader.readByte(); // Tree Style 3
+        const treeStyle4 = reader.readByte(); // Tree Style 4
+        const caveBack1 = reader.readInt32(); // Cave Back 1
+        const caveBack2 = reader.readInt32(); // Cave Back 2
+        const caveBack3 = reader.readInt32(); // Cave Back 3
+        const caveBackStyle1 = reader.readByte(); // Cave Back Style 1
+        const caveBackStyle2 = reader.readByte(); // Cave Back Style 2
+        const caveBackStyle3 = reader.readByte(); // Cave Back Style 3
+        const caveBackStyle4 = reader.readByte(); // Cave Back Style 4
+        const treeTopVariation1 = reader.readByte(); // Tree Tops Variation 1
+        const treeTopVariation2 = reader.readByte(); // Tree Tops Variation 2
+        const treeTopVariation3 = reader.readByte(); // Tree Tops Variation 3
+        const treeTopVariation4 = reader.readByte(); // Tree Tops Variation 4
+        const treeTopVariation5 = reader.readByte(); // Tree Tops Variation 5
+        const treeTopVariation6 = reader.readByte(); // Tree Tops Variation 6
+        const treeTopVariation7 = reader.readByte(); // Tree Tops Variation 7
+        const treeTopVariation8 = reader.readByte(); // Tree Tops Variation 8
+        const treeTopVariation9 = reader.readByte(); // Tree Tops Variation 9
+        const treeTopVariation10 = reader.readByte(); // Tree Tops Variation 10
+        const treeTopVariation11 = reader.readByte(); // Tree Tops Variation 11
+        const treeTopVariation12 = reader.readByte(); // Tree Tops Variation 12
+        const treeTopVariation13 = reader.readByte(); // Tree Tops Variation 13
+        const rain = reader.readSingle(); // Rain
+        const eventInfo = new BitsByte(reader.readByte());
+        const eventInfo2 = new BitsByte(reader.readByte());
+        const eventInfo3 = new BitsByte(reader.readByte());
+        const eventInfo4 = new BitsByte(reader.readByte());
+        const eventInfo5 = new BitsByte(reader.readByte());
+        const eventInfo6 = new BitsByte(reader.readByte());
+        const eventInfo7 = new BitsByte(reader.readByte());
+        const copperOreTier = reader.readInt16();
+        const ironOreTier = reader.readInt16();
+        const silverOreTier = reader.readInt16();
+        const goldOreTier = reader.readInt16();
+        const cobaltOreTier = reader.readInt16();
+        const mythrilOreTier = reader.readInt16();
+        const adamantiteOreTier = reader.readInt16();
+        const invasionType = reader.readByte();
         const lobbyId = reader.readUInt64();
         const sandstormSeverity = reader.readSingle();
         packet.data = new PacketWriter()
             .setType(PacketTypes.WorldInfo)
             .packInt32(time)
-            .packByte(dayMoon)
+            .packByte(dayAndMoon)
             .packByte(moonPhase)
-            .packInt16(maxTilesX)
-            .packInt16(maxTilesY)
-            .packInt16(spawnX)
-            .packInt16(spawnY)
+            .packInt16(maxTiles.x)
+            .packInt16(maxTiles.y)
+            .packInt16(spawn.x)
+            .packInt16(spawn.y)
             .packInt16(worldSurface)
             .packInt16(rockLayer)
             .packInt32(worldId)
             .packString(worldName)
             .packByte(moonType)
-            .packByte(treeBg)
-            .packByte(corruptBg)
-            .packByte(jungleBg)
-            .packByte(snowBg)
-            .packByte(hallowBg)
-            .packByte(crimsonBg)
-            .packByte(desertBg)
-            .packByte(oceanBg)
+            .packByte(treeBackgroud1)
+            .packByte(corruptionBackground)
+            .packByte(jungleBackground)
+            .packByte(snowBackground)
+            .packByte(hallowBackground)
+            .packByte(crimsonBackground)
+            .packByte(desertBackground)
+            .packByte(oceanBackground)
             .packByte(iceBackStyle)
             .packByte(jungleBackStyle)
             .packByte(hellBackStyle)
-            .packSingle(windSpeed)
+            .packSingle(windSpeedSet)
             .packByte(cloudNum)
             .packInt32(tree1)
             .packInt32(tree2)
@@ -254,10 +334,10 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             .packByte(caveBackStyle3)
             .packByte(caveBackStyle4)
             .packSingle(rain)
-            .packByte(eventInfo)
-            .packByte(eventInfo2)
-            .packByte(eventInfo3)
-            .packByte(eventInfo4)
+            .packByte(eventInfo.value)
+            .packByte(eventInfo2.value)
+            .packByte(eventInfo3.value)
+            .packByte(eventInfo4.value)
             .packByte(invasionType)
             .packUInt64(lobbyId)
             .data;
@@ -294,8 +374,9 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             if (server.client.state !== ClientState.FullyConnected) {
                 packet.data = Buffer.allocUnsafe(0);
             }
-        } else {
+        } else if (moduleId > 1) {
             packet.data = Buffer.allocUnsafe(0);
+            return true;
         }
 
         return false;
@@ -423,69 +504,88 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
     }
 
     private handleNpcUpdate(server: TerrariaServer, packet: Packet): boolean {
-        const reader = new PacketReader(packet.data);
-        const npcId = reader.readInt16();
-        const position = {
+        const reader: PacketReader = new PacketReader(packet.data);
+        const npcSlotId: number = reader.readInt16();
+        const position: Point = {
             x: reader.readSingle(),
-            y: reader.readSingle(),
+            y: reader.readSingle()
         };
-        const velocity = {
+        const velocity: Point = {
             x: reader.readSingle(),
-            y: reader.readSingle(),
+            y: reader.readSingle()
         };
-        const target = reader.readUInt16(); // -> byte
-        const val = reader.readByte();
-        const flags = new BitsByte(val);
-        const ai: number[] = [];
-        for (let i = 0; i < 4; i++) {
-            if (flags[i + 2]) {
-                ai[i] = reader.readSingle();
-            }
+        const target: number = reader.readUInt16();
+        const npcFlags1 = new BitsByte(reader.readByte());
+        const npcFlags2 = new BitsByte(reader.readByte());
+        const ai: [
+            number | null,
+            number | null,
+            number | null,
+            number | null
+        ] = [null, null, null, null];
+        if (npcFlags1[2]) {
+            ai[0] = reader.readSingle();
         }
-        const npcNetId = reader.readInt16();
-        if (npcNetId >= 540) {
+        if (npcFlags1[3]) {
+            ai[1] = reader.readSingle();
+        }
+        if (npcFlags1[4]) {
+            ai[2] = reader.readSingle();
+        }
+        if (npcFlags1[5]) {
+            ai[3] = reader.readSingle();
+        }
+
+        const npcNetId: number = reader.readInt16();
+        if (npcNetId > 539) { // 539 is the last supported mobile npc id
             packet.data = Buffer.allocUnsafe(0);
-            return false;
+            return true;
         }
-        let life: number | undefined = undefined;
-        let lifeBytes: number | undefined = undefined;
-        if (!flags[7]) {
+
+        let playerCountForMultiplayerDifficultyOverride: number | null = null;
+        if (npcFlags2[0]) {
+            playerCountForMultiplayerDifficultyOverride = reader.readByte();
+        }
+        let strengthMultiplier: number | null = null;
+        if (npcFlags2[2]) {
+            strengthMultiplier = reader.readSingle();
+        }
+        let life: number | null = null;
+        let lifeBytes: number | null = null;
+        if (!npcFlags1[7]) {
             lifeBytes = reader.readByte();
-            switch(lifeBytes) {
-                case 2:
-                    life = reader.readInt16();
-                    break;
-                case 4:
-                    life = reader.readInt32();
-                    break;
-                default:
-                    life = reader.readSByte();
-                    break;
+            if (lifeBytes == 2) {
+                life = reader.readInt16();
+            } else if (lifeBytes == 4) {
+                life = reader.readInt32();
+            } else {
+                life = reader.readSByte();
             }
         }
 
-        let release: number | undefined = undefined;
-        if (reader.head < reader.data.length) {
-            release = reader.readByte();
+        let releaseOwner: number | null = null;
+        if (reader.head < packet.data.length) {
+            releaseOwner = reader.readByte();
         }
 
         const newPacket = new PacketWriter()
             .setType(PacketTypes.NPCUpdate)
-            .packInt16(npcId)
+            .packInt16(npcSlotId)
             .packSingle(position.x)
             .packSingle(position.y)
             .packSingle(velocity.x)
             .packSingle(velocity.y)
             .packByte(target === PC_SERVER_ID ? MOBILE_SERVER_ID : Math.min(MAX_CLIENT_ID, target))
-            .packByte(val);
+            .packByte(npcFlags1.value);
 
         for (let i = 0; i < 4; i++) {
-            if (typeof ai[i] !== "undefined") {
-                newPacket.packSingle(ai[i]);
+            const aiVal = ai[i];
+            if (aiVal !== null) {
+                newPacket.packSingle(aiVal);
             }
         }
         newPacket.packInt16(npcNetId);
-        if (!flags[7]) {
+        if (life !== null) {
             newPacket.packByte(lifeBytes as number);
             switch (lifeBytes) {
                 case 2:
@@ -500,8 +600,8 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             }
         }
 
-        if (typeof release !== "undefined") {
-            newPacket.packByte(release);
+        if (releaseOwner !== null) {
+            newPacket.packByte(releaseOwner);
         }
 
         packet.data = newPacket.data;
@@ -524,7 +624,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         } else {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.PlayerDamage)
-                .packByte(getPlayerId(playerId, realId))
+                .packByte(getPlayerId(playerId))
                 .packByte(hitDirection)
                 .packInt16(damage)
                 .packString(deathReason.deathReason)
@@ -550,7 +650,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         } else {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.KillMe)
-                .packByte(getPlayerId(playerId, realId))
+                .packByte(getPlayerId(playerId))
                 .packByte(hitDirection)
                 .packInt16(damage)
                 .packByte(flags)
@@ -581,7 +681,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
     private handleAddPlayerBuff(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const playerId = reader.readByte();
-        const buff = reader.readByte();
+        const buff = reader.readUInt16();
         const time = reader.readInt32();
 
         const realId = this._mcl.realId.get(server.client);
@@ -592,7 +692,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
                 .setType(PacketTypes.AddPlayerBuff)
                 .packByte(typeof realId === "undefined" ? playerId : FAKED_CLIENT_ID)
                 .packByte(buff)
-                .packInt16(time) // Maybe fix this cause int32 -> int16 might not work properly
+                .packInt16(Math.ceil(time / 60)) // Maybe fix this cause int32 -> int16 might not work properly
                 .data;
         }
 
@@ -620,32 +720,85 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
 
     private handleProjectileUpdate(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
-        const projectileId = reader.readInt16();
-        const position = {
-            x: reader.readSingle(),
-            y: reader.readSingle(),
-        };
-        const velocity = {
-            x: reader.readSingle(),
-            y: reader.readSingle(),
-        };
-        const knockback = reader.readSingle();
-        const damage = reader.readInt16();
+        const ident = reader.readInt16();
+        const positionX = reader.readSingle();
+        const positionY = reader.readSingle();
+        const velocityX = reader.readSingle();
+        const velocityY = reader.readSingle();
         const owner = reader.readByte();
-        const type = reader.readInt16();
+        const projType = reader.readInt16();
+        const ai = reader.readByte();
+        const hasDamage = (ai & 16) === 16;
+        const hasKnockback = (ai & 32) === 32;
+        const needsUuid = (ai & 128) === 128;
+        const hasOriginalDamage = (ai & 64) === 64;
+        const hasAi0 = (ai & 1) === 1;
+        const hasAi1 = (ai & 2) === 2;
 
-        // 650 is last supported projectile type on mobile (from wiki)
-        if (type > 650) {
-            packet.data = Buffer.allocUnsafe(0);
+        let ai0 = 0;
+        if (hasAi0) {
+            ai0 = reader.readSingle();
+        }
+
+        let ai1 = 0;
+        if (hasAi1) {
+            ai1 = reader.readSingle();
+        }
+
+        let damage = 0;
+        if (hasDamage) {
+            damage = reader.readInt16();
+        }
+
+        let knockback = 0;
+        if (hasKnockback) {
+            knockback = reader.readSingle();
+        }
+
+        let originalDamage = 0;
+        if (hasOriginalDamage) {
+            originalDamage = reader.readInt16();
+        }
+
+        let uuid = 0;
+        if (needsUuid) {
+            uuid = reader.readInt16();
+        }
+
+        let aiFixed = 0;
+        aiFixed |= hasAi0 ? 1 : 0;
+        aiFixed |= hasAi1 ? 2 : 0;
+        aiFixed |= needsUuid ? 4 : 0;
+        const writer = new PacketWriter()
+            .setType(PacketTypes.ProjectileUpdate)
+            .packInt16(ident)
+            .packSingle(positionX)
+            .packSingle(positionY)
+            .packSingle(velocityX)
+            .packSingle(velocityY)
+            .packSingle(knockback)
+            .packInt16(damage)
+            .packByte(getPlayerId(owner))
+            .packInt16(projType)
+            .packByte(aiFixed);
+
+        if (hasAi0) {
+            writer.packSingle(ai0);
+        }
+
+        if (hasAi1) {
+            writer.packSingle(ai1);
+        }
+
+        if (needsUuid) {
+            writer.packSingle(uuid);
         }
 
         const realId = this._mcl.realId.get(server.client);
-        if (owner === PC_SERVER_ID) {
-            packet.data.writeUInt8(MOBILE_SERVER_ID, reader.head - 3);
-        } else if (playerIdNotMobileCompatible(owner, realId)) {
+        // 650 is last supported projectile type on mobile (from wiki)
+        if (projType > 650 || playerIdNotMobileCompatible(owner, realId)) {
             packet.data = Buffer.allocUnsafe(0);
-        } else if (shouldFakeId(owner, realId)) {
-            packet.data.writeUInt8(FAKED_CLIENT_ID, PACKET_HEADER_BYTES + 2 + 4 + 4 + 4 + 4 + 4 + 2); // change owner to the fake id
+            return true;
         }
 
         return false;
@@ -728,6 +881,183 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             .packByte(PC_SERVER_ID)
             .data
         );
+
+        return false;
+    }
+
+    private handleSpawnPlayer(server: TerrariaServer, packet: Packet): boolean {
+        const reader = new PacketReader(packet.data);
+        const playerId = reader.readByte();
+        const location = {
+            x: reader.readInt16(),
+            y: reader.readInt16(),
+        };
+        const respawnTimeRemaining = reader.readInt32()
+        const context = reader.readByte();
+        const realId = this._mcl.realId.get(server.client);
+        if (playerIdNotMobileCompatible(playerId, realId)) {
+            packet.data = Buffer.allocUnsafe(0);
+            return true;
+        } else {
+            packet.data = new PacketWriter()
+                .setType(PacketTypes.SpawnPlayer)
+                .packByte(getPlayerId(playerId))
+                .packInt16(location.x)
+                .packInt16(location.y)
+                .data;
+
+            return false;
+        }
+    }
+
+    private handleUpdatePlayer(server: TerrariaServer, packet: Packet): boolean {
+        const reader = new PacketReader(packet.data);
+        const playerId = reader.readByte();
+        const control = new BitsByte(reader.readByte());
+        const pulley = new BitsByte(reader.readByte());
+        const misc = new BitsByte(reader.readByte());
+        const sleeping = new BitsByte(reader.readByte());
+        const selectedItem = reader.readByte();
+        const position = {
+            x: reader.readSingle(),
+            y: reader.readSingle(),
+        };
+
+        let velocity: Point | null = null;
+        if (pulley[2]) {
+            velocity = {
+                x: reader.readSingle(),
+                y: reader.readSingle(),
+            };
+        }
+
+        let originalPosition: Point | null = null;
+        let homePosition: Point | null = null;
+        if (misc[6]) {
+            originalPosition = {
+                x: reader.readSingle(),
+                y: reader.readSingle(),
+            };
+            homePosition = {
+                x: reader.readSingle(),
+                y: reader.readSingle(),
+            };
+        }
+
+        const realId = this._mcl.realId.get(server.client);
+        if (playerIdNotMobileCompatible(playerId, realId)) {
+            packet.data = Buffer.allocUnsafe(0);
+            return true;
+        } else {
+            const buffer = new PacketWriter()
+                .setType(PacketTypes.UpdatePlayer)
+                .packByte(getPlayerId(playerId))
+                .packByte(control.value)
+                .packByte(pulley.value)
+                .packByte(selectedItem)
+                .packSingle(position.x)
+                .packSingle(position.y);
+
+            if (velocity !== null) {
+                buffer
+                    .packSingle(velocity.x)
+                    .packSingle(velocity.y)
+            }
+
+            packet.data = buffer.data
+            return false;
+        }
+    }
+
+    private handleUpdatePlayerBuff(server: TerrariaServer, packet: Packet): boolean {
+        const reader = new PacketReader(packet.data);
+        const playerId = reader.readByte();
+
+        const realId = this._mcl.realId.get(server.client);
+        if (playerIdNotMobileCompatible(playerId, realId)) {
+            packet.data = Buffer.allocUnsafe(0);
+            return true;
+        } else {
+            const writer = new PacketWriter()
+                .setType(PacketTypes.UpdatePlayerBuff)
+                .packByte(getPlayerId(playerId));
+            for (let i = 0; i < 22; i++ ) {
+                const buffType = reader.readUInt16();
+                if (buffType <= 255) { // byte type supported by server goes up to 255
+                    writer.packByte(buffType);
+                } else {
+                    writer.packByte(0); // default to just no buff here because server cannot store/read the buff types > 255
+                }
+            }
+
+            packet.data = writer.data;
+            return false;
+        }
+    }
+
+    private handlePlayerInfo(server: TerrariaServer, packet: Packet): boolean {
+        const reader = new PacketReader(packet.data);
+        const playerId = reader.readByte(); // Player ID
+        const skinVariant = reader.readByte();
+        const hair = reader.readByte();
+        const name = reader.readString();
+        const hairDye = reader.readByte();
+        const hideVisuals = reader.readByte();
+        const hideVisuals2 = reader.readByte();
+        const hideMisc = reader.readByte();
+        const hairColor = reader.readColor();
+        const skinColor = reader.readColor();
+        const eyeColor = reader.readColor();
+        const shirtColor = reader.readColor();
+        const underShirtColor = reader.readColor();
+        const pantsColor = reader.readColor();
+        const shoeColor = reader.readColor();
+        const difficulty = reader.readByte();
+        try {
+        const torchInfo = reader.readByte();
+        } catch(e) { } // DG not yet updated to always have this
+
+        const realId = this._mcl.realId.get(server.client);
+        if (playerIdNotMobileCompatible(playerId, realId)) {
+            packet.data = Buffer.allocUnsafe(0);
+            return true;
+        } else {
+            packet.data = new PacketWriter()
+                .setType(PacketTypes.PlayerInfo)
+                .packByte(playerId)
+                .packByte(skinVariant)
+                .packByte(hair)
+                .packString(name)
+                .packByte(hairDye)
+                .packByte(hideVisuals)
+                .packByte(hideVisuals2)
+                .packByte(hideMisc)
+                .packColor(hairColor)
+                .packColor(skinColor)
+                .packColor(eyeColor)
+                .packColor(shirtColor)
+                .packColor(underShirtColor)
+                .packColor(pantsColor)
+                .packColor(shoeColor)
+                .packByte(difficulty)
+                .data;
+
+            return false;
+        }
+    }
+
+    private handleAddNpcBuff(server: TerrariaServer, packet: Packet) {
+        const reader = new PacketReader(packet.data);
+        const npcId = reader.readInt16();
+        const buff = reader.readUInt16();
+        const time = reader.readInt16();
+
+        packet.data = new PacketWriter()
+            .setType(PacketTypes.AddNPCBuff)
+            .packInt16(npcId)
+            .packByte(buff)
+            .packInt16(time)
+            .data;
 
         return false;
     }

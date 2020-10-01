@@ -7,6 +7,8 @@ import PacketReader from 'dimensions/packets/packetreader';
 import MCL, { MAX_CLIENT_ID, MOBILE_SERVER_ID, PC_SERVER_ID } from './';
 import BufferReader from 'dimensions/packets/bufferreader';
 import BufferWriter from 'dimensions/packets/bufferwriter';
+import BitsByte from 'dimensions/datatypes/bitsbyte';
+import Point from 'dimensions/point';
 
 class PriorClientHandler extends ClientPacketHandler {
     protected _mcl: MCL;
@@ -49,6 +51,12 @@ class PriorClientHandler extends ClientPacketHandler {
             case PacketTypes.UpdateItemOwner:
                 this.handleUpdateItemOwner(client, packet);
                 break;
+            case PacketTypes.PlayerInventorySlot:
+                handled = this.handlePlayerInventorySlot(client, packet);
+                break;
+            case PacketTypes.UpdatePlayer:
+                handled = this.handleUpdatePlayer(client, packet);
+                break;
         }
         return handled;
     }
@@ -71,7 +79,7 @@ class PriorClientHandler extends ClientPacketHandler {
             this._mcl.clients.add(client);
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
-                .packString("Terraria194")
+                .packString("Terraria226")
                 .data;
             return false;
         }
@@ -159,7 +167,7 @@ class PriorClientHandler extends ClientPacketHandler {
         packet.data = new PacketWriter()
             .setType(PacketTypes.AddPlayerBuff)
             .packByte(playerId)
-            .packByte(buff)
+            .packUInt16(buff)
             .packInt32(time)
             .data;
 
@@ -181,6 +189,65 @@ class PriorClientHandler extends ClientPacketHandler {
             .packByte(0)
             .data;
 
+        return false;
+    }
+
+    private handlePlayerInventorySlot(client: Client, packet: Packet) {
+        const reader = new PacketReader(packet.data);
+        const playerId = reader.readByte();
+        const slotId = reader.readByte();
+        const stack = reader.readInt16();
+        const prefix = reader.readByte();
+        const itemNetId = reader.readInt16();
+        packet.data = new PacketWriter()
+            .setType(PacketTypes.PlayerInventorySlot)
+            .packByte(playerId)
+            .packInt16(slotId)
+            .packInt16(stack)
+            .packByte(prefix)
+            .packInt16(itemNetId)
+            .data;
+
+        return false;
+    }
+
+    private handleUpdatePlayer(client: Client, packet: Packet): boolean {
+        const reader = new PacketReader(packet.data);
+        const playerId = reader.readByte();
+        const control = new BitsByte(reader.readByte());
+        const pulley = new BitsByte(reader.readByte());
+        const selectedItem = reader.readByte();
+        const position = {
+            x: reader.readSingle(),
+            y: reader.readSingle(),
+        };
+
+        let velocity: Point | null = null;
+        if (pulley[2]) {
+            velocity = {
+                x: reader.readSingle(),
+                y: reader.readSingle(),
+            };
+        }
+
+        const buffer = new PacketWriter()
+            .setType(PacketTypes.UpdatePlayer)
+            .packByte(playerId)
+            .packByte(control.value)
+            .packByte(pulley.value)
+            .packByte(0)
+            .packByte(0)
+            .packByte(selectedItem)
+            .packSingle(position.x)
+            .packSingle(position.y);
+
+        if (velocity !== null) {
+            buffer
+                .packSingle(velocity.x)
+                .packSingle(velocity.y)
+        }
+
+        packet.data = buffer.data
         return false;
     }
 }

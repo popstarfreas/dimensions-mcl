@@ -26,7 +26,7 @@ class MobileCompatibilityLayer implements Extension {
 
     constructor() {
         this.name = "Mobile Compatibility Layer";
-        this.version = "v1.1";
+        this.version = "v1.2";
         this.author = "popstarfreas";
         this.reloadable = false;
         this.priorPacketHandlers = new PriorPacketHandler(this);
