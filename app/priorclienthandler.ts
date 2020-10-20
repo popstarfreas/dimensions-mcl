@@ -5,10 +5,9 @@ import PacketTypes from 'dimensions/packettypes';
 import PacketWriter from 'dimensions/packets/packetwriter';
 import PacketReader from 'dimensions/packets/packetreader';
 import MCL, { MAX_CLIENT_ID, MOBILE_SERVER_ID, PC_SERVER_ID } from './';
-import BufferReader from 'dimensions/packets/bufferreader';
-import BufferWriter from 'dimensions/packets/bufferwriter';
 import BitsByte from 'dimensions/datatypes/bitsbyte';
 import Point from 'dimensions/point';
+import PlayerDeathReason from 'dimensions/datatypes/playerdeathreason';
 
 class PriorClientHandler extends ClientPacketHandler {
     protected _mcl: MCL;
@@ -33,29 +32,17 @@ class PriorClientHandler extends ClientPacketHandler {
             case PacketTypes.ConnectRequest:
                 handled = this.handleConnectRequest(client, packet);
                 break;
-            case PacketTypes.ChatMessage:
-                handled = this.handleChatMessage(client, packet);
-                break;
-            case PacketTypes.PlayerDamage:
+            case PacketTypes.PlayerHurtV2:
                 handled = this.handlePlayerDamage(client, packet);
                 break;
-            case PacketTypes.KillMe:
-                handled = this.handlePlayerKillMe(client, packet);
+            case PacketTypes.PlayerDeathV2:
+                handled = this.handlePlayerDeath(client, packet);
                 break;
             case PacketTypes.AddPlayerBuff:
                 handled = this.handleAddPlayerBuff(client, packet);
                 break;
-            case PacketTypes.PlayerZone:
-                handled = this.handlePlayerZone(client, packet);
-                break;
             case PacketTypes.UpdateItemOwner:
                 this.handleUpdateItemOwner(client, packet);
-                break;
-            case PacketTypes.PlayerInventorySlot:
-                handled = this.handlePlayerInventorySlot(client, packet);
-                break;
-            case PacketTypes.UpdatePlayer:
-                handled = this.handleUpdatePlayer(client, packet);
                 break;
         }
         return handled;
@@ -75,81 +62,62 @@ class PriorClientHandler extends ClientPacketHandler {
         let reader = new PacketReader(packet.data);
         let version = reader.readString();
         // Mobile Version
-        if (version === "Terraria155" || version === "Terraria156") {
+        if (version === "Terraria230") {
             this._mcl.clients.add(client);
-            packet.data = new PacketWriter()
+            /*packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
                 .packString("Terraria226")
-                .data;
+                .data;*/
             return false;
         }
-        return false;
-    }
-
-    private handleChatMessage(client: Client, packet: Packet) {
-        let reader = new PacketReader(packet.data);
-        reader.readByte();
-        reader.readByte();
-        reader.readByte();
-        reader.readByte();
-        let message = reader.readString();
-        packet.packetType = PacketTypes.LoadNetModule;
-        packet.data = new PacketWriter()
-            .setType(PacketTypes.LoadNetModule)
-            .packUInt16(1)
-            .packString("Say")
-            .packString(message)
-            .data;
         return false;
     }
 
     private handlePlayerDamage(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
         let playerId = reader.readByte();
-        const hitDirection = reader.readByte();
+        const deathReason = new PlayerDeathReason(reader);
         const damage = reader.readInt16();
-        const message = reader.readString();
+        const hitDirection = reader.readByte();
         const flags = reader.readByte();
+        const cooldownCounter = reader.readSByte();
         const realId = this._mcl.realId.get(client);
+
         if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
             playerId = realId;
+            const writer = new PacketWriter()
+                .setType(PacketTypes.PlayerHurtV2)
+                .packByte(playerId)
+            writer.packBuffer(deathReason.getHexData())
+                .packInt16(damage)
+                .packByte(hitDirection)
+                .packByte(flags)
+                .packSByte(cooldownCounter)
+            packet.data = writer.data;
         }
-
-        packet.data = new PacketWriter()
-            .setType(PacketTypes.PlayerHurtV2)
-            .packByte(playerId)
-            .packByte(128)
-            .packString(message)
-            .packInt16(damage)
-            .packByte(hitDirection)
-            .packByte(flags)
-            .packSByte(0)
-            .data;
 
         return false;
     }
 
-    private handlePlayerKillMe(client: Client, packet: Packet) {
+    private handlePlayerDeath(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
         let playerId = reader.readByte();
-        const hitDirection = reader.readByte();
+        const deathReason = new PlayerDeathReason(reader);
         const damage = reader.readInt16();
-        const message = reader.readString();
+        const hitDirection = reader.readByte();
         const flags = reader.readByte();
         const realId = this._mcl.realId.get(client);
         if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
             playerId = realId;
+            const writer = new PacketWriter()
+                .setType(PacketTypes.PlayerDeathV2)
+                .packByte(playerId);
+            writer.packBuffer(deathReason.getHexData())
+                .packInt16(damage)
+                .packByte(hitDirection)
+                .packByte(flags);
+            packet.data = writer.data;
         }
-
-        packet.data = new PacketWriter()
-            .setType(PacketTypes.PlayerDeathV2)
-            .packByte(playerId)
-            .packByte(128)
-            .packString(message)
-            .packInt16(damage)
-            .packByte(hitDirection)
-            .packByte(flags)
-            .data;
 
         return false;
     }
@@ -157,97 +125,20 @@ class PriorClientHandler extends ClientPacketHandler {
     private handleAddPlayerBuff(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
         let playerId = reader.readByte();
-        const buff = reader.readByte();
-        const time = reader.readInt16();
+        const buff = reader.readUInt16();
+        const time = reader.readInt32();
         const realId = this._mcl.realId.get(client);
         if (playerId === MAX_CLIENT_ID && typeof realId !== "undefined") {
             playerId = realId;
+
+            packet.data = new PacketWriter()
+                .setType(PacketTypes.AddPlayerBuff)
+                .packByte(playerId)
+                .packUInt16(buff)
+                .packInt32(time)
+                .data;
         }
 
-        packet.data = new PacketWriter()
-            .setType(PacketTypes.AddPlayerBuff)
-            .packByte(playerId)
-            .packUInt16(buff)
-            .packInt32(time)
-            .data;
-
-        return false;
-    }
-
-    private handlePlayerZone(client: Client, packet: Packet) {
-        const reader = new PacketReader(packet.data);
-        const playerId = reader.readByte();
-        const zone1 = reader.readByte();
-        const zone2 = reader.readByte();
-
-        packet.data = new PacketWriter()
-            .setType(PacketTypes.PlayerZone)
-            .packByte(playerId)
-            .packByte(zone1)
-            .packByte(zone2)
-            .packByte(0)
-            .packByte(0)
-            .data;
-
-        return false;
-    }
-
-    private handlePlayerInventorySlot(client: Client, packet: Packet) {
-        const reader = new PacketReader(packet.data);
-        const playerId = reader.readByte();
-        const slotId = reader.readByte();
-        const stack = reader.readInt16();
-        const prefix = reader.readByte();
-        const itemNetId = reader.readInt16();
-        packet.data = new PacketWriter()
-            .setType(PacketTypes.PlayerInventorySlot)
-            .packByte(playerId)
-            .packInt16(slotId)
-            .packInt16(stack)
-            .packByte(prefix)
-            .packInt16(itemNetId)
-            .data;
-
-        return false;
-    }
-
-    private handleUpdatePlayer(client: Client, packet: Packet): boolean {
-        const reader = new PacketReader(packet.data);
-        const playerId = reader.readByte();
-        const control = new BitsByte(reader.readByte());
-        const pulley = new BitsByte(reader.readByte());
-        const selectedItem = reader.readByte();
-        const position = {
-            x: reader.readSingle(),
-            y: reader.readSingle(),
-        };
-
-        let velocity: Point | null = null;
-        if (pulley[2]) {
-            velocity = {
-                x: reader.readSingle(),
-                y: reader.readSingle(),
-            };
-        }
-
-        const buffer = new PacketWriter()
-            .setType(PacketTypes.UpdatePlayer)
-            .packByte(playerId)
-            .packByte(control.value)
-            .packByte(pulley.value)
-            .packByte(0)
-            .packByte(0)
-            .packByte(selectedItem)
-            .packSingle(position.x)
-            .packSingle(position.y);
-
-        if (velocity !== null) {
-            buffer
-                .packSingle(velocity.x)
-                .packSingle(velocity.y)
-        }
-
-        packet.data = buffer.data
         return false;
     }
 }

@@ -25,8 +25,8 @@ class MobileCompatibilityLayer implements Extension {
     public realId: Map<Client, number> = new Map<Client, number>(); // used when server tells mobile client their id > MAX_CLIENT_ID
 
     constructor() {
-        this.name = "Mobile Compatibility Layer";
-        this.version = "v1.2";
+        this.name = "Mobile Compatibility Layer for 1.4";
+        this.version = "v1.4";
         this.author = "popstarfreas";
         this.reloadable = false;
         this.priorPacketHandlers = new PriorPacketHandler(this);
