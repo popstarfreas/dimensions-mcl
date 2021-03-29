@@ -28,6 +28,9 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.ProjectileUpdate:
                 this.handleProjectileUpdate(server, packet);
                 break;
+            case PacketTypes.LoadNetModule:
+                this.handleLoadNetModule(server, packet);
+                break;
         }
         return handled;
     }
@@ -151,6 +154,22 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         if (projType > 849) {
             packet.data = Buffer.allocUnsafe(0);
             return true;
+        }
+
+        return false;
+    }
+
+    private handleLoadNetModule(server: TerrariaServer, packet: Packet): boolean {
+        const reader = new PacketReader(packet.data);
+        const netModuleId = reader.readUInt16();
+        /// Creative Unlocks Module
+        if (netModuleId === 5) {
+            const itemId = reader.readInt16();
+            // Is 5043 and 5044 from 1.4.0.5?
+            if (itemId > 5042) {
+                packet.data = Buffer.allocUnsafe(0);
+                return true;
+            }
         }
 
         return false;
