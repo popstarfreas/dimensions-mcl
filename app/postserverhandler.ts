@@ -170,6 +170,19 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
                 packet.data = Buffer.allocUnsafe(0);
                 return true;
             }
+        // Bestiary
+        } else if (netModuleId === 4) {
+          const unlockType = reader.readByte();
+          let killCount: number | null = null;
+          const npcId = reader.readInt16();
+          if (unlockType === 0) {
+              killCount = reader.readUInt16();
+          }
+
+          if (npcId >= 663) {
+              packet.data = Buffer.allocUnsafe(0);
+              return true;
+          }
         }
 
         return false;

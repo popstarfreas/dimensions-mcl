@@ -20,7 +20,7 @@ class MobileCompatibilityLayer implements Extension {
     public clients: Set<Client> = new Set<Client>();
 
     constructor() {
-        this.name = "Mobile Compatibility Layer 1.4.0.5 -> 1.4.1.1. ";
+        this.name = "Mobile Compatibility Layer 1.4.0.5 -> 1.4.1.1. With iOS support!";
         this.version = "v1.4";
         this.author = "popstarfreas";
         this.reloadable = false;
