@@ -4,14 +4,14 @@ import Packet from 'dimensions/packet';
 import PacketTypes from 'dimensions/packettypes';
 import PacketWriter from 'dimensions/packets/packetwriter';
 import PacketReader from 'dimensions/packets/packetreader';
-import MCL  from './';
+import CL from './';
 
 class PriorClientHandler extends ClientPacketHandler {
-    protected _mcl: MCL;
+    protected _cl: CL;
 
-    constructor(mcl: MCL) {
+    constructor(cl: CL) {
         super();
-        this._mcl = mcl;
+        this._cl = cl;
     }
 
     public handlePacket(client: Client, packet: Packet) {
@@ -22,7 +22,7 @@ class PriorClientHandler extends ClientPacketHandler {
 
     private handleIncompatiblePacket(client: Client, packet: Packet) {
         let handled = false;
-        if (!this._mcl.clients.has(client) && packet.packetType !== PacketTypes.ConnectRequest) {
+        if (!this._cl.clients.has(client) && packet.packetType !== PacketTypes.ConnectRequest) {
             return false;
         }
         switch (packet.packetType) {
@@ -37,9 +37,9 @@ class PriorClientHandler extends ClientPacketHandler {
     private handleConnectRequest(client: Client, packet: Packet) {
         let reader = new PacketReader(packet.data);
         let version = reader.readString();
-        // Mobile Version
-        if (version === "Terraria230") {
-            this._mcl.clients.add(client);
+        // 1.4.1.2 Version
+        if (version === "Terraria234") {
+            this._cl.clients.add(client);
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
                 .packString("Terraria233")

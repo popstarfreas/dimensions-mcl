@@ -9,7 +9,7 @@ export const PACKET_LEN_BYTES = 2;
 export const PACKET_TYPE_BYTES = 1;
 export const PACKET_HEADER_BYTES = PACKET_LEN_BYTES + PACKET_TYPE_BYTES;
 
-class MobileCompatibilityLayer implements Extension {
+class CompatibilityLayer implements Extension {
     public name: string;
     public version: string;
     public author: string;
@@ -20,8 +20,8 @@ class MobileCompatibilityLayer implements Extension {
     public clients: Set<Client> = new Set<Client>();
 
     constructor() {
-        this.name = "Mobile Compatibility Layer 1.4.0.5 -> 1.4.1.1. ";
-        this.version = "v1.4";
+        this.name = "Compatibility Layer 1.4.1.2 -> 1.4.1.1. ";
+        this.version = "v1.0";
         this.author = "popstarfreas";
         this.reloadable = false;
         this.priorPacketHandlers = new PriorPacketHandler(this);
@@ -38,4 +38,4 @@ class MobileCompatibilityLayer implements Extension {
 
 }
 
-export default MobileCompatibilityLayer;
+export default CompatibilityLayer;

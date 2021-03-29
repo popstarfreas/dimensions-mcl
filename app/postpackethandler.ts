@@ -1,12 +1,12 @@
 import { PacketHandler } from "dimensions/extension";
-import MCL from "./";
+import CL from "./";
 import PostServerHandler from "./postserverhandler";
 
 class PostPacketHandler implements PacketHandler {
     serverHandler: PostServerHandler;
 
-    constructor(mcl: MCL) {
-        this.serverHandler = new PostServerHandler(mcl);
+    constructor(cl: CL) {
+        this.serverHandler = new PostServerHandler(cl);
     }
 }
 
