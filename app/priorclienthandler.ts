@@ -37,8 +37,8 @@ class PriorClientHandler extends ClientPacketHandler {
     private handleConnectRequest(client: Client, packet: Packet) {
         let reader = new PacketReader(packet.data);
         let version = reader.readString();
-        // 1.4.1.2 Version
-        if (version === "Terraria234") {
+        // 1.4.1.2 Version || 1.4.2 Version
+        if (version === "Terraria234" || version === "Terraria235") {
             this._cl.clients.add(client);
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
