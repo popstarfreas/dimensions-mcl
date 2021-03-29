@@ -38,7 +38,6 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const tileX = reader.readInt16();
         const tileY = reader.readInt16();
         const tileData = reader.readBuffer(packet.data.length - reader.head);
-        console.log("TileX", tileX, "TileY", tileY, "Size", size, "TileChangeType", tileChangeType);
         packet.data = new PacketWriter()
             .setType(PacketTypes.SendTileSquare)
             .packUInt16(tileX)
