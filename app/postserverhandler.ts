@@ -5,6 +5,8 @@ import PacketWriter from "dimensions/packets/packetwriter";
 import PacketTypes from "dimensions/packettypes";
 import TerrariaServer from "dimensions/terrariaserver";
 import CL from ".";
+import * as WorldInfo1405 from "rescript-terrariapacket/src/packet/v1405/Packetv1405_WorldInfo";
+import * as WorldInfo from "rescript-terrariapacket/src/packet/Packet_WorldInfo";
 
 class PriorServerHandler extends TerrariaServerPacketHandler {
     protected _cl: CL;
@@ -23,8 +25,18 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.SendTileSquare:
                 handled = this.handleSendTileSquare(server, packet);
                 break;
+            case PacketTypes.WorldInfo:
+                handled = this.handleWorldInfo(server, packet);
+                break;
         }
         return handled;
+    }
+
+    private handleWorldInfo(server: TerrariaServer, packet: Packet): boolean {
+        const oldWorldInfo = WorldInfo1405.parse(packet.data);
+        const newWorldInfo = WorldInfo1405.convertToLatest(oldWorldInfo);
+        packet.data = WorldInfo.toBuffer(newWorldInfo);
+        return false;
     }
 
     private handleSendTileSquare(server: TerrariaServer, packet: Packet): boolean {
