@@ -95,7 +95,6 @@ class PriorClientHandler extends ClientPacketHandler {
                          .packBuffer(reader.readBuffer(packet.data.length - reader.head))
                          .data;
         } else {
-            return true;
         }
 
         return false;
