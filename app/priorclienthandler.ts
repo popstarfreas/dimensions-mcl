@@ -82,7 +82,7 @@ class PriorClientHandler extends ClientPacketHandler {
         return false;
     }
 
-    private handleSendTileRectangle(client, packet: Packet) {
+    private handleSendTileRectangle(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
         const tileX = reader.readInt16();
         const tileY = reader.readInt16();
