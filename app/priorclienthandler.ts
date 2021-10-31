@@ -6,7 +6,6 @@ import PacketWriter from 'dimensions/packets/packetwriter';
 import PacketReader from 'dimensions/packets/packetreader';
 import BitsByte from 'dimensions/datatypes/bitsbyte';
 import CL from './';
-import tileFrameImportant from './tileframeimportant';
 
 class PriorClientHandler extends ClientPacketHandler {
     protected _cl: CL;
