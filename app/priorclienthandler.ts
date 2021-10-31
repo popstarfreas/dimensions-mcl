@@ -84,10 +84,10 @@ class PriorClientHandler extends ClientPacketHandler {
 
     private handleSendTileRectangle(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
-        const tileX = reader.readInt16();
-        const tileY = reader.readInt16();
-        const sizeX = reader.readByte();
-        const sizeY = reader.readByte();
+        let tileX = reader.readInt16();
+        let tileY = reader.readInt16();
+        let sizeX = reader.readByte();
+        let sizeY = reader.readByte();
         const tileChangeType = reader.readByte();
 
         if (sizeX == sizeY) {
