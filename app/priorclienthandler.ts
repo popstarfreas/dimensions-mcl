@@ -6,6 +6,7 @@ import PacketWriter from 'dimensions/packets/packetwriter';
 import PacketReader from 'dimensions/packets/packetreader';
 import BitsByte from 'dimensions/datatypes/bitsbyte';
 import CL from './';
+import tileFrameImportant from './tileframeimportant';
 
 class PriorClientHandler extends ClientPacketHandler {
     protected _cl: CL;
@@ -88,29 +89,33 @@ class PriorClientHandler extends ClientPacketHandler {
         const sizeX = reader.readByte();
         const sizeY = reader.readByte();
         const tileChangeType = reader.readByte();
-        const tileData = reader.readBuffer(packet.data.length - reader.head);
 
         if (sizeX == sizeY) {
-            const writer = new PacketWriter()
-                .setType(PacketTypes.SendTileSquare);
-
-            if (tileChangeType != 0) {
-                writer.packUInt16((sizeX & 0x7FFF) | 0x8000);
-                writer.packByte(tileChangeType);
-            } else {
-                writer.packUInt16(sizeX);
-            }
-
-            writer.packInt16(tileX)
-                  .packInt16(tileY)
-                  .packBuffer(tileData);
-
-            packet.data = writer.data;
+            packet.data = createSTSWriter(sizeX, tileChangeType, tileX, tileY)
+                         .packBuffer(reader.readBuffer(packet.data.length - reader.head))
+                         .data;
         } else {
             return true;
         }
 
         return false;
+
+        function createSTSWriter(size, tileChangeType, tileX, tileY) {
+            const writer = new PacketWriter()
+                .setType(PacketTypes.SendTileSquare);
+
+            if (tileChangeType != 0) {
+                writer.packUInt16((size & 0x7FFF) | 0x8000);
+                writer.packByte(tileChangeType);
+            } else {
+                writer.packUInt16(size);
+            }
+
+            writer.packInt16(tileX)
+                  .packInt16(tileY);
+
+            return writer;
+        }
     }
 
 }
