@@ -39,14 +39,19 @@ class PriorClientHandler extends ClientPacketHandler {
 
 
     private handleConnectRequest(client: Client, packet: Packet) {
-        let reader = new PacketReader(packet.data);
-        let version = reader.readString();
-        // 1.4.1.2 Version || 1.4.2 Version || 1.4.2.1 Version || 1.4.2.2 || 1.4.2.3
-        if (version === "Terraria234" || version === "Terraria235" || version === "Terraria236" || version === "Terraria237" || version === "Terraria238") {
+        const reader = new PacketReader(packet.data);
+        const version = reader.readString();
+        const versionMatch = version.match(/Terraria(\d+)/)
+        const versionNumber = versionMatch?.[1];
+        let isPcVersion = false;
+        if (versionNumber && parseInt(versionNumber).toString() === versionNumber) {
+            isPcVersion = parseInt(versionNumber) >= 234; // 1.4.1.2 or above
+        }
+        if (isPcVersion) {
             this._cl.clients.add(client);
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
-                .packString("Terraria233")
+                .packString("Terraria233") // 1.4.1.1
                 .data;
             return false;
         }

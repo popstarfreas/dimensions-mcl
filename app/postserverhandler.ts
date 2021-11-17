@@ -5,8 +5,8 @@ import PacketWriter from "dimensions/packets/packetwriter";
 import PacketTypes from "dimensions/packettypes";
 import TerrariaServer from "dimensions/terrariaserver";
 import CL from ".";
-import * as WorldInfo1405 from "rescript-terrariapacket/src/packet/v1405/Packetv1405_WorldInfo";
-import * as WorldInfo from "rescript-terrariapacket/src/packet/Packet_WorldInfo";
+import * as WorldInfo1405 from "@darkgaming/rescript-terrariapacket/src/packet/v1405/Packetv1405_WorldInfo";
+import * as WorldInfo from "@darkgaming/rescript-terrariapacket/src/packet/Packet_WorldInfo";
 
 class PriorServerHandler extends TerrariaServerPacketHandler {
     protected _cl: CL;

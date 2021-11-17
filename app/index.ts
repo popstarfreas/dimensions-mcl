@@ -20,8 +20,8 @@ class CompatibilityLayer implements Extension {
     public clients: Set<Client> = new Set<Client>();
 
     constructor() {
-        this.name = "Compatibility Layer 1.4.1.2 -> 1.4.1.1. ";
-        this.version = "v1.0";
+        this.name = "Compatibility Layer 1.4.1.2 and above -> 1.4.1.1. ";
+        this.version = "v1.1";
         this.author = "popstarfreas";
         this.reloadable = false;
         this.priorPacketHandlers = new PriorPacketHandler(this);

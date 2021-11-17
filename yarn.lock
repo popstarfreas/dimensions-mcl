@@ -2,10 +2,28 @@
 # yarn lockfile v1
 
 
-"@popstarfreas/packetfactory@^4.0.1", "@popstarfreas/packetfactory@^4.1.1":
+"@darkgaming/rescript-terrariapacket@popstarfreas/rescript-terrariapacket#e69036d79227795eb7beb7bdda9e5ab037590815":
+  version "1.0.1"
+  resolved "https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/e69036d79227795eb7beb7bdda9e5ab037590815"
+  dependencies:
+    "@popstarfreas/packetfactory" "^4.3.0"
+    "@popstarfreas/rescript-nodejs" "^14.1.0"
+    rescript "^9.1.4"
+
+"@popstarfreas/packetfactory@^4.1.1":
   version "4.1.1"
   resolved "https://registry.yarnpkg.com/@popstarfreas/packetfactory/-/packetfactory-4.1.1.tgz#1036fac188fd1cbcec921d49d5560bb0e6d62b9b"
   integrity sha512-C2aUxw2eVLa4MYAADc4bhmUHk4+sFRGhtlksgu77IA/x3AFYQW0k07E0wBnwlulLrwXil6jHQGFRD9nnpZq6Mg==
+  dependencies:
+    "@popstarfreas/rescript-nodejs" "^14.1.0"
+    utf8 "^2.1.2"
+  optionalDependencies:
+    rescript "^9.1.1"
+
+"@popstarfreas/packetfactory@^4.3.0":
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/@popstarfreas/packetfactory/-/packetfactory-4.3.0.tgz#c627cc866c16fc91d7e1e31529a8556447305e35"
+  integrity sha512-fpQIuvYxrjB954QPOgGV4rUJkEn+fRjeTtxGjkVnbT+KlJ1RUtvnVq9fsSL2HDWqn3nFVkq+o28QkiF/39OS6Q==
   dependencies:
     "@popstarfreas/rescript-nodejs" "^14.1.0"
     utf8 "^2.1.2"
@@ -165,18 +183,15 @@ requirejs@^2.2.0:
   resolved "https://registry.yarnpkg.com/requirejs/-/requirejs-2.3.6.tgz#e5093d9601c2829251258c0b9445d4d19fa9e7c9"
   integrity sha512-ipEzlWQe6RK3jkzikgCupiTbTvm4S0/CAU5GlgptkN5SO6F3u0UD0K18wy6ErDqiCyP4J4YYe1HuAShvsxePLg==
 
-"rescript-terrariapacket@ssh://github.com:popstarfreas/rescript-terrariapacket.git#24c1401":
-  version "1.0.0"
-  resolved "ssh://github.com:popstarfreas/rescript-terrariapacket.git#24c14016a770458e847221869d372d5e0164cd77"
-  dependencies:
-    "@popstarfreas/packetfactory" "^4.0.1"
-    "@popstarfreas/rescript-nodejs" "^14.1.0"
-    rescript "^9.1.3"
-
-rescript@^9.1.1, rescript@^9.1.3:
+rescript@^9.1.1:
   version "9.1.3"
   resolved "https://registry.yarnpkg.com/rescript/-/rescript-9.1.3.tgz#1a0f41342acd8dc4e26fd1782d0997b8a7577698"
   integrity sha512-TpfW3DakgCJtWbRvAek7cysuikBWarjqt8PrbFg0Rk3O+o4dt0inBdxyZe/+u3LOAWzyKK+2UlqC0xiCBgs6pQ==
+
+rescript@^9.1.4:
+  version "9.1.4"
+  resolved "https://registry.yarnpkg.com/rescript/-/rescript-9.1.4.tgz#1eb126f98d6c16942c0bf0df67c050198e580515"
+  integrity sha512-aXANK4IqecJzdnDpJUsU6pxMViCR5ogAxzuqS0mOr8TloMnzAjJFu63fjD6LCkWrKAhlMkFFzQvVQYaAaVkFXw==
 
 typescript@^4.3.5:
   version "4.3.5"
