@@ -34,7 +34,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
 
     private handleWorldInfo(server: TerrariaServer, packet: Packet): boolean {
         const oldWorldInfo = WorldInfo1405.parse(packet.data);
-        const newWorldInfo = WorldInfo1405.convertToLatest(oldWorldInfo);
+        const newWorldInfo = WorldInfo1405.toLatest(oldWorldInfo);
         packet.data = WorldInfo.toBuffer(newWorldInfo);
         return false;
     }
