@@ -21,7 +21,7 @@ class CompatibilityLayer implements Extension {
 
     constructor() {
         this.name = "Compatibility Layer 1.4.1.2 and above -> 1.4.1.1. ";
-        this.version = "v1.1";
+        this.version = "v1.2";
         this.author = "popstarfreas";
         this.reloadable = false;
         this.priorPacketHandlers = new PriorPacketHandler(this);
