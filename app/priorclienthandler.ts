@@ -33,6 +33,9 @@ class PriorClientHandler extends ClientPacketHandler {
             case PacketTypes.ProjectileUpdate:
                 handled = this.handleProjectileUpdate(client, packet);
                 break;
+            case PacketTypes.SendTileSquare:
+                handled = this.handleSendTileRectangle(client, packet);
+                break;
         }
         return handled;
     }
@@ -81,6 +84,42 @@ class PriorClientHandler extends ClientPacketHandler {
             packet.data.writeInt16LE(12, startFrom);
         }
         return false;
+    }
+
+    private handleSendTileRectangle(client: Client, packet: Packet) {
+        const reader = new PacketReader(packet.data);
+        let tileX = reader.readInt16();
+        let tileY = reader.readInt16();
+        let sizeX = reader.readByte();
+        let sizeY = reader.readByte();
+        const tileChangeType = reader.readByte();
+
+        if (sizeX == sizeY) {
+            packet.data = createSTSWriter(sizeX, tileChangeType, tileX, tileY)
+                         .packBuffer(reader.readBuffer(packet.data.length - reader.head))
+                         .data;
+        } else {
+            return true;
+        }
+
+        return false;
+
+        function createSTSWriter(size, tileChangeType, tileX, tileY) {
+            const writer = new PacketWriter()
+                .setType(PacketTypes.SendTileSquare);
+
+            if (tileChangeType != 0) {
+                writer.packUInt16((size & 0x7FFF) | 0x8000);
+                writer.packByte(tileChangeType);
+            } else {
+                writer.packUInt16(size);
+            }
+
+            writer.packInt16(tileX)
+                  .packInt16(tileY);
+
+            return writer;
+        }
     }
 
 }
