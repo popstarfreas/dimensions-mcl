@@ -16,6 +16,10 @@ class PriorClientHandler extends ClientPacketHandler {
     }
 
     public handlePacket(client: Client, packet: Packet) {
+        if (this._cl.config.excludedServers.has(client.server.name)) {
+            return false;
+        }
+
         let handled = false;
         handled = this.handleIncompatiblePacket(client, packet);
         return handled;
