@@ -17,9 +17,6 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
     }
 
     public handlePacket(server: TerrariaServer, packet: Packet) {
-        if (!this._cl.clients.has(server.client)) {
-            return false;
-        }
         let handled = false;
         switch (packet.packetType) {
             case PacketTypes.SendTileSquare:

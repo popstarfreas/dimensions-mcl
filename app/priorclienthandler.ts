@@ -23,9 +23,6 @@ class PriorClientHandler extends ClientPacketHandler {
 
     private handleIncompatiblePacket(client: Client, packet: Packet) {
         let handled = false;
-        if (!this._cl.clients.has(client) && packet.packetType !== PacketTypes.ConnectRequest) {
-            return false;
-        }
         switch (packet.packetType) {
             case PacketTypes.ConnectRequest:
                 handled = this.handleConnectRequest(client, packet);
