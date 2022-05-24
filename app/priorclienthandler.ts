@@ -52,7 +52,6 @@ class PriorClientHandler extends ClientPacketHandler {
             isPcVersion = parseInt(versionNumber) >= 234; // 1.4.1.2 or above
         }
         if (isPcVersion) {
-            this._cl.clients.add(client);
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
                 .packString("Terraria233") // 1.4.1.1

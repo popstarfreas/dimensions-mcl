@@ -21,7 +21,6 @@ class CompatibilityLayer implements Extension {
     public priorPacketHandlers: PriorPacketHandler;
     public postPacketHandlers: PostPacketHandler;
     public listenServers: { [name: string]: ListenServer };
-    public clients: Set<Client> = new Set<Client>();
     public config: CLConfig;
 
     configWatcher: FSWatcher;
@@ -47,10 +46,6 @@ class CompatibilityLayer implements Extension {
 
     public setListenServers(listenServers: { [name: string]: ListenServer }): void {
         this.listenServers = listenServers;
-    }
-
-    public socketClosePostHandler(_socket: Socket, client: Client) {
-        this.clients.delete(client);
     }
 
 }
