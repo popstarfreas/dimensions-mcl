@@ -9,7 +9,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc -p ./",
-    "build:packed": "esbuild build/index.js --bundle --platform=node --outfile=packed/index.js"
+    "build:packed": "esbuild build/index.js --bundle --platform=node --external:*/clconfig.json --outfile=packed/index.js"
   },
   "author": "",
   "license": "ISC",
