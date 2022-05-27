@@ -17,7 +17,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
     }
 
     public handlePacket(server: TerrariaServer, packet: Packet) {
-        if (this._cl.config.excludedServers.has(server.name)) {
+        if (this._cl.excludedServers.has(server.name)) {
             return false;
         }
 

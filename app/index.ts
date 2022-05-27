@@ -21,6 +21,7 @@ class CompatibilityLayer implements Extension {
     public priorPacketHandlers: PriorPacketHandler;
     public postPacketHandlers: PostPacketHandler;
     public listenServers: { [name: string]: ListenServer };
+    public excludedServers: Set<string>;
     public config: CLConfig;
 
     configWatcher: FSWatcher;
@@ -33,15 +34,21 @@ class CompatibilityLayer implements Extension {
         this.priorPacketHandlers = new PriorPacketHandler(this);
         this.postPacketHandlers = new PostPacketHandler(this);
 
-        this.config = require('./clconfig.json');
+        this.config = this.processConfig(require('./clconfig.json'));
 
         this.configWatcher = watch(join(__dirname, "clconfig.json"), (eventType, filename) => {
             if (eventType === "change")
             {
                 let configPath = join(__dirname, "clconfig.json");
-                this.config = requireNoCache(configPath, require);
+                this.config = this.processConfig(requireNoCache(configPath, require));
             }
         });
+    }
+
+    private processConfig(config: CLConfig) : CLConfig {
+        this.excludedServers = new Set(config.excludedServers);
+        config.excludedServers = [...this.excludedServers];
+        return config;
     }
 
     public setListenServers(listenServers: { [name: string]: ListenServer }): void {

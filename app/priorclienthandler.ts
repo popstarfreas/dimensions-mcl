@@ -16,7 +16,7 @@ class PriorClientHandler extends ClientPacketHandler {
     }
 
     public handlePacket(client: Client, packet: Packet) {
-        if (this._cl.config.excludedServers.has(client.server.name)) {
+        if (this._cl.excludedServers.has(client.server.name)) {
             return false;
         }
 

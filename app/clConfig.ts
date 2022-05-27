@@ -1,3 +1,3 @@
 export default interface CLConfig {
-    excludedServers: Set<string>;
+    excludedServers: string[];
 }
