@@ -35,7 +35,7 @@ class CompatibilityLayer implements Extension {
 
         this.config = require('./clconfig.json');
 
-        this.configWatcher = watch("./clconfig.json", (eventType, filename) => {
+        this.configWatcher = watch(join(__dirname, "clconfig.json"), (eventType, filename) => {
             if (eventType === "change")
             {
                 let configPath = join(__dirname, "clconfig.json");
