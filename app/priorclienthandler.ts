@@ -16,6 +16,10 @@ class PriorClientHandler extends ClientPacketHandler {
     }
 
     public handlePacket(client: Client, packet: Packet) {
+        if (this._cl.excludedServers.has(client.server.name.toLowerCase())) {
+            return false;
+        }
+
         let handled = false;
         handled = this.handleIncompatiblePacket(client, packet);
         return handled;
@@ -23,9 +27,6 @@ class PriorClientHandler extends ClientPacketHandler {
 
     private handleIncompatiblePacket(client: Client, packet: Packet) {
         let handled = false;
-        if (!this._cl.clients.has(client) && packet.packetType !== PacketTypes.ConnectRequest) {
-            return false;
-        }
         switch (packet.packetType) {
             case PacketTypes.ConnectRequest:
                 handled = this.handleConnectRequest(client, packet);
@@ -51,7 +52,6 @@ class PriorClientHandler extends ClientPacketHandler {
             isPcVersion = parseInt(versionNumber) >= 234; // 1.4.1.2 or above
         }
         if (isPcVersion) {
-            this._cl.clients.add(client);
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
                 .packString("Terraria233") // 1.4.1.1
