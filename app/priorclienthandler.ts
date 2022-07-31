@@ -47,6 +47,9 @@ class PriorClientHandler extends ClientPacketHandler {
         const version = reader.readString();
         const versionMatch = version.match(/Terraria(\d+)/)
         const versionNumber = versionMatch?.[1];
+        if ((client as any).version === "unknown") {
+          (client as any).version = version;
+        }
         let isPcVersion = false;
         if (versionNumber && parseInt(versionNumber).toString() === versionNumber) {
             isPcVersion = parseInt(versionNumber) >= 234; // 1.4.1.2 or above
