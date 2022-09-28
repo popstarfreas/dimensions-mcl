@@ -6,6 +6,7 @@ import PacketWriter from 'dimensions/packets/packetwriter';
 import PacketReader from 'dimensions/packets/packetreader';
 import BitsByte from 'dimensions/datatypes/bitsbyte';
 import CL from './';
+import { is144 } from './is144';
 
 class PriorClientHandler extends ClientPacketHandler {
     protected _cl: CL;
@@ -36,6 +37,9 @@ class PriorClientHandler extends ClientPacketHandler {
                 break;
             case PacketTypes.SendTileSquare:
                 handled = this.handleSendTileRectangle(client, packet);
+                break;
+            case PacketTypes.PlayerInventorySlot:
+                handled = this.handleInventorySlot(client, packet);
                 break;
         }
         return handled;

@@ -7,6 +7,7 @@ import TerrariaServer from "dimensions/terrariaserver";
 import CL from ".";
 import * as WorldInfo1405 from "@darkgaming/rescript-terrariapacket/src/packet/v1405/Packetv1405_WorldInfo";
 import * as WorldInfo from "@darkgaming/rescript-terrariapacket/src/packet/Packet_WorldInfo";
+import { is144 } from "./is144";
 
 class PriorServerHandler extends TerrariaServerPacketHandler {
     protected _cl: CL;
@@ -26,8 +27,17 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.SendTileSquare:
                 handled = this.handleSendTileSquare(server, packet);
                 break;
+            case PacketTypes.SendSection:
+                handled = this.handleSendSection(server, packet);
+                break;
             case PacketTypes.WorldInfo:
                 handled = this.handleWorldInfo(server, packet);
+                break;
+            case PacketTypes.PlayerInfo:
+                handled = this.handlePlayerInfo(server, packet);
+                break;
+            case PacketTypes.SpawnPlayer:
+                handled = this.handleSpawnPlayer(server, packet);
                 break;
         }
         return handled;
@@ -59,6 +69,53 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             .packByte(size)
             .packByte(tileChangeType)
             .packBuffer(tileData)
+            .data;
+
+        return false;
+    }
+
+    private handleSendSection(server: TerrariaServer, packet: Packet): boolean {
+        if (!is144((server.client as any).version)) {
+            return false;
+        }
+
+        const reader = new PacketReader(packet.data);
+        const payload = reader.readBuffer(packet.data.length - 3)
+        const correctedPayload = payload.slice(1);
+        packet.data = new PacketWriter().setType(packet.packetType)
+            .packBuffer(correctedPayload)
+            .data;
+
+
+        return false;
+    }
+
+    private handlePlayerInfo(server: TerrariaServer, packet: Packet): boolean {
+        if (!is144((server.client as any).version)) {
+            return false;
+        }
+
+        const reader = new PacketReader(packet.data);
+        const payload = reader.readBuffer(packet.data.length - 3);
+        packet.data = new PacketWriter().setType(packet.packetType)
+            .packBuffer(payload)
+            .packByte(0)
+            .data;
+
+        return false;
+    }
+
+    private handleSpawnPlayer(server: TerrariaServer, packet: Packet): boolean {
+        if (!is144((server.client as any).version)) {
+            return false;
+        }
+
+        const reader = new PacketReader(packet.data);
+        const payload = reader.readBuffer(packet.data.length - 3);
+        packet.data = new PacketWriter().setType(packet.packetType)
+            .packBuffer(payload)
+            .packInt16(0)
+            .packInt16(0)
             .data;
 
         return false;
