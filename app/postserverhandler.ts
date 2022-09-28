@@ -7,6 +7,8 @@ import TerrariaServer from "dimensions/terrariaserver";
 import CL from ".";
 import * as WorldInfo1405 from "@darkgaming/rescript-terrariapacket/src/packet/v1405/Packetv1405_WorldInfo";
 import * as WorldInfo from "@darkgaming/rescript-terrariapacket/src/packet/Packet_WorldInfo";
+import * as TileSquare1405 from "@darkgaming/rescript-terrariapacket/src/packet/v1405/Packetv1405_TileSquareSend";
+import * as TileSquare from "@darkgaming/rescript-terrariapacket/src/packet/Packet_TileSquareSend";
 import { is144 } from "./is144";
 
 class PriorServerHandler extends TerrariaServerPacketHandler {
@@ -39,6 +41,18 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             case PacketTypes.SpawnPlayer:
                 handled = this.handleSpawnPlayer(server, packet);
                 break;
+            case PacketTypes.UpdatePlayerBuff:
+                handled = this.handlePlayerBuffs(server, packet);
+                break;
+            case PacketTypes.UpdateNPCBuff:
+                handled = this.handleNpcBuffs(server, packet);
+                break;
+            case 134:
+                handled = this.handlePlayerLuckFactors(server, packet);
+                break;
+            case PacketTypes.UpdateMoonLordCountdown:
+                handled = this.handleUpdateMoonLordCountdown(server, packet);
+                break;
         }
         return handled;
     }
@@ -51,6 +65,18 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
     }
 
     private handleSendTileSquare(server: TerrariaServer, packet: Packet): boolean {
+        if (!is144((server.client as any).version)) {
+            return this.handle143SendTileSquare(server, packet);
+        }
+
+        const old = TileSquare1405.parse(packet.data);
+        const new_ = TileSquare1405.toLatest(old);
+        packet.data = TileSquare.toBuffer(new_);
+
+        return false;
+    }
+
+    private handle143SendTileSquare(server: TerrariaServer, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const sizeAndChangeFlag = reader.readUInt16();
         const size = sizeAndChangeFlag & 32767;
@@ -117,6 +143,74 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             .packInt16(0)
             .packInt16(0)
             .data;
+
+        return false;
+    }
+
+    private handlePlayerBuffs(server: TerrariaServer, packet: Packet): boolean {
+        if (!is144((server.client as any).version)) {
+            return false;
+        }
+
+        const reader = new PacketReader(packet.data);
+        const payload = reader.readBuffer(packet.data.length - 3);
+        const writer = new PacketWriter().setType(packet.packetType)
+            .packBuffer(payload);
+        // 22 new buff slots
+        for (let i = 0; i < 22; i++) {
+            writer.packUInt16(0);
+        }
+        packet.data = writer.data;
+
+        return false;
+    }
+
+    private handleNpcBuffs(server: TerrariaServer, packet: Packet): boolean {
+        if (!is144((server.client as any).version)) {
+            return false;
+        }
+
+        const reader = new PacketReader(packet.data);
+        const payload = reader.readBuffer(packet.data.length - 3);
+        const writer = new PacketWriter().setType(packet.packetType)
+            .packBuffer(payload);
+        // 15 new buff slots
+        for (let i = 0; i < 15; i++) {
+            writer.packUInt16(0);
+            writer.packInt16(0);
+        }
+        packet.data = writer.data;
+
+        return false;
+    }
+
+    private handlePlayerLuckFactors(server: TerrariaServer, packet: Packet): boolean {
+        if (!is144((server.client as any).version)) {
+            return false;
+        }
+
+        const reader = new PacketReader(packet.data);
+        const payload = reader.readBuffer(packet.data.length - 3);
+        const writer = new PacketWriter().setType(packet.packetType)
+            .packBuffer(payload)
+            .packSingle(0)
+            .packSingle(0);
+        packet.data = writer.data;
+
+        return false;
+    }
+
+    private handleUpdateMoonLordCountdown(server: TerrariaServer, packet: Packet): boolean {
+        if (!is144((server.client as any).version)) {
+            return false;
+        }
+
+        const reader = new PacketReader(packet.data);
+        const payload = reader.readBuffer(packet.data.length - 3);
+        const writer = new PacketWriter().setType(packet.packetType)
+            .packInt32(100) // Idk what to set max to
+            .packBuffer(payload);
+        packet.data = writer.data;
 
         return false;
     }

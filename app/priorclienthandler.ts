@@ -52,12 +52,13 @@ class PriorClientHandler extends ClientPacketHandler {
         const versionMatch = version.match(/Terraria(\d+)/)
         const versionNumber = versionMatch?.[1];
         if ((client as any).version === "unknown") {
-          (client as any).version = version;
+            (client as any).version = version;
         }
         let isPcVersion = false;
         if (versionNumber && parseInt(versionNumber).toString() === versionNumber) {
             isPcVersion = parseInt(versionNumber) >= 234; // 1.4.1.2 or above
         }
+        console.log((client as any).version);
         if (isPcVersion) {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
@@ -65,6 +66,18 @@ class PriorClientHandler extends ClientPacketHandler {
                 .data;
             return false;
         }
+        return false;
+    }
+
+    private handleInventorySlot(client, packet: Packet) {
+        const reader = new PacketReader(packet.data);
+        const id = reader.readByte();
+        const slot = reader.readInt16();
+        if (slot > 259) {
+            packet.data = Buffer.alloc(0);
+            return true;
+        }
+
         return false;
     }
 
