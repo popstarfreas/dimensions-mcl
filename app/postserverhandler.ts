@@ -10,6 +10,9 @@ import * as WorldInfo from "@darkgaming/rescript-terrariapacket/src/packet/Packe
 import * as TileSquare1405 from "@darkgaming/rescript-terrariapacket/src/packet/v1405/Packetv1405_TileSquareSend";
 import * as TileSquare from "@darkgaming/rescript-terrariapacket/src/packet/Packet_TileSquareSend";
 import { is144 } from "./is144";
+import ClientState from "dimensions/clientstate";
+
+const MAX_INVENTORY_SLOT = 349;
 
 class PriorServerHandler extends TerrariaServerPacketHandler {
     protected _cl: CL;
@@ -61,6 +64,22 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
         const oldWorldInfo = WorldInfo1405.parse(packet.data);
         const newWorldInfo = WorldInfo1405.toLatest(oldWorldInfo);
         packet.data = WorldInfo.toBuffer(newWorldInfo);
+
+        if (server.isSSC && server.client.state == ClientState.FinalisingSwitch) {
+                server.client.socket.write(new PacketWriter().setType(147).packByte(server.client.player.id).packByte(0).data);
+                server.client.socket.write(packet.data); for (let i = 260; i <= 349; i++) {
+                    const packet = new PacketWriter()
+                        .setType(PacketTypes.PlayerInventorySlot)
+                        .packByte(server.client.player.id)
+                        .packInt16(i)
+                        .packInt16(0)
+                        .packByte(0)
+                        .packInt16(0)
+                        .data;
+                    server.client.socket.write(packet);
+                }
+                return true;
+        }
         return false;
     }
 

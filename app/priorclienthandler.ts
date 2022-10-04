@@ -41,6 +41,9 @@ class PriorClientHandler extends ClientPacketHandler {
             case PacketTypes.PlayerInventorySlot:
                 handled = this.handleInventorySlot(client, packet);
                 break;
+          case 147:
+                handled = this.handleLoadoutSwitch(client, packet);
+              break;
         }
         return handled;
     }
@@ -69,12 +72,24 @@ class PriorClientHandler extends ClientPacketHandler {
         return false;
     }
 
-    private handleInventorySlot(client, packet: Packet) {
+    private handleInventorySlot(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
         const id = reader.readByte();
         const slot = reader.readInt16();
         if (slot > 259) {
             packet.data = Buffer.alloc(0);
+
+            if (client.server.isSSC) {
+                const packet = new PacketWriter()
+                    .setType(PacketTypes.PlayerInventorySlot)
+                    .packByte(client.player.id)
+                    .packInt16(slot)
+                    .packInt16(0)
+                    .packByte(0)
+                    .packInt16(0)
+                    .data;
+                client.socket.write(packet);
+            }
             return true;
         }
 
@@ -116,8 +131,8 @@ class PriorClientHandler extends ClientPacketHandler {
 
         if (sizeX == sizeY) {
             packet.data = createSTSWriter(sizeX, tileChangeType, tileX, tileY)
-                         .packBuffer(reader.readBuffer(packet.data.length - reader.head))
-                         .data;
+                .packBuffer(reader.readBuffer(packet.data.length - reader.head))
+                .data;
         } else {
             return true;
         }
@@ -136,12 +151,23 @@ class PriorClientHandler extends ClientPacketHandler {
             }
 
             writer.packInt16(tileX)
-                  .packInt16(tileY);
+                .packInt16(tileY);
 
             return writer;
         }
     }
 
+  private handleLoadoutSwitch(client: Client, packet: Packet) {
+      const reader = new PacketReader(packet.data);
+      const _playerSlotIndex = reader.readByte();
+      const loadoutIndex = reader.readByte();
+      if (loadoutIndex > 0 && client.server.isSSC) {
+          client.socket.write(new PacketWriter().setType(147).packByte(client.player.id).packByte(0).data);
+          return true;
+      }
+
+      return false;
+  }
 }
 
 export default PriorClientHandler;
