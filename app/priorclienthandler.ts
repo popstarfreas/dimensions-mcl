@@ -7,6 +7,8 @@ import PacketReader from 'dimensions/packets/packetreader';
 import BitsByte from 'dimensions/datatypes/bitsbyte';
 import CL from './';
 import { is144 } from './is144';
+import * as TileSquare1405 from "@darkgaming/rescript-terrariapacket/src/packet/v1405/Packetv1405_TileSquareSend";
+import * as TileSquare from "@darkgaming/rescript-terrariapacket/src/packet/Packet_TileSquareSend";
 
 class PriorClientHandler extends ClientPacketHandler {
     protected _cl: CL;
@@ -122,6 +124,15 @@ class PriorClientHandler extends ClientPacketHandler {
     }
 
     private handleSendTileRectangle(client: Client, packet: Packet) {
+      const old = TileSquare.parse(packet.data);
+      const new_ = TileSquare1405.fromLatest(old);
+
+      packet.data = new_ ?? null;
+
+      return false;
+    }
+
+    /*private handleSendTileRectangle(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
         let tileX = reader.readInt16();
         let tileY = reader.readInt16();
@@ -155,7 +166,7 @@ class PriorClientHandler extends ClientPacketHandler {
 
             return writer;
         }
-    }
+    }*/
 
   private handleLoadoutSwitch(client: Client, packet: Packet) {
       const reader = new PacketReader(packet.data);
