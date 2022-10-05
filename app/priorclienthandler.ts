@@ -124,15 +124,18 @@ class PriorClientHandler extends ClientPacketHandler {
     }
 
     private handleSendTileRectangle(client: Client, packet: Packet) {
-      const old = TileSquare.parse(packet.data);
-      const new_ = TileSquare1405.fromLatest(old);
+        if (!is144((client as any).version)) {
+            return this.handle143SendTileRectangle(client, packet);
+        }
+        const old = TileSquare.parse(packet.data);
+        const new_ = TileSquare1405.fromLatest(old);
 
-      packet.data = new_ ?? null;
+        packet.data = new_ ?? null;
 
-      return false;
+        return false;
     }
 
-    /*private handleSendTileRectangle(client: Client, packet: Packet) {
+    private handle143SendTileRectangle(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
         let tileX = reader.readInt16();
         let tileY = reader.readInt16();
@@ -166,19 +169,19 @@ class PriorClientHandler extends ClientPacketHandler {
 
             return writer;
         }
-    }*/
+    }
 
-  private handleLoadoutSwitch(client: Client, packet: Packet) {
-      const reader = new PacketReader(packet.data);
-      const _playerSlotIndex = reader.readByte();
-      const loadoutIndex = reader.readByte();
-      if (loadoutIndex > 0 && client.server.isSSC) {
-          client.socket.write(new PacketWriter().setType(147).packByte(client.player.id).packByte(0).data);
-          return true;
-      }
+    private handleLoadoutSwitch(client: Client, packet: Packet) {
+        const reader = new PacketReader(packet.data);
+        const _playerSlotIndex = reader.readByte();
+        const loadoutIndex = reader.readByte();
+        if (loadoutIndex > 0 && client.server.isSSC) {
+            client.socket.write(new PacketWriter().setType(147).packByte(client.player.id).packByte(0).data);
+            return true;
+        }
 
-      return false;
-  }
+        return false;
+    }
 }
 
 export default PriorClientHandler;
