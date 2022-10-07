@@ -1,3 +1,4 @@
 export default interface CLConfig {
-    excludedServers: string[];
+    fakeVersion: number;
+    pcServers: string[];
 }

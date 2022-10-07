@@ -21,7 +21,7 @@ class CompatibilityLayer implements Extension {
     public priorPacketHandlers: PriorPacketHandler;
     public postPacketHandlers: PostPacketHandler;
     public listenServers: { [name: string]: ListenServer };
-    public excludedServers: Set<string>;
+    public pcServers: Set<string>;
     public config: CLConfig;
 
     configWatcher: FSWatcher;
@@ -46,8 +46,8 @@ class CompatibilityLayer implements Extension {
     }
 
     private processConfig(config: CLConfig) : CLConfig {
-        this.excludedServers = new Set(config.excludedServers);
-        config.excludedServers = [...this.excludedServers];
+        this.pcServers = new Set(config.pcServers);
+        config.pcServers = [...this.pcServers];
         return config;
     }
 

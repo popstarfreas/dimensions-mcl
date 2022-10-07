@@ -19,7 +19,11 @@ class PriorClientHandler extends ClientPacketHandler {
     }
 
     public handlePacket(client: Client, packet: Packet) {
-        if (this._cl.excludedServers.has(client.server.name.toLowerCase())) {
+        if (this._cl.pcServers.has(client.server.name.toLowerCase())) {
+            switch (packet.packetType) {
+                case PacketTypes.ConnectRequest:
+                    return this.handleConnectRequestToPCServer(client, packet);
+            }
             return false;
         }
 
@@ -50,6 +54,25 @@ class PriorClientHandler extends ClientPacketHandler {
         return handled;
     }
 
+    private handleConnectRequestToPCServer(client: Client, packet: Packet) : boolean {
+        const reader = new PacketReader(packet.data);
+        const versionString = reader.readString();
+        if (versionString.length !== 'Terraria000'.length) {
+            return false;
+        }
+
+        const version = parseInt(versionString.substring('Terraria'.length));
+        const fakeVersion = this._cl.config.fakeVersion;
+        if (version !== fakeVersion) {
+            packet.data = new PacketWriter()
+                .setType(PacketTypes.ConnectRequest)
+                .packString(`Terraria${fakeVersion}`)
+                .data
+                ;
+        }
+
+        return false;
+    }
 
     private handleConnectRequest(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
