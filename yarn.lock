@@ -2,9 +2,9 @@
 # yarn lockfile v1
 
 
-"@darkgaming/rescript-terrariapacket@popstarfreas/rescript-terrariapacket#e69036d79227795eb7beb7bdda9e5ab037590815":
-  version "1.0.1"
-  resolved "https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/e69036d79227795eb7beb7bdda9e5ab037590815"
+"@darkgaming/rescript-terrariapacket@popstarfreas/rescript-terrariapacket#2c7183ff12450c46d19d7bda7446d2825c2e3bdb":
+  version "1.1.0"
+  resolved "https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/2c7183ff12450c46d19d7bda7446d2825c2e3bdb"
   dependencies:
     "@popstarfreas/packetfactory" "^4.3.0"
     "@popstarfreas/rescript-nodejs" "^14.1.0"
