@@ -33,7 +33,7 @@ class PriorServerHandler extends TerrariaServerPacketHandler {
             const name = reader.head < reader.data.length
                 ? reader.readString()
                 : `${ip}:${port}`
-            this.currentServer?.client.changeServer({
+            server.client.changeServer({
                 name: name,
                 serverIP: ip,
                 serverPort: port
