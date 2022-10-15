@@ -47,9 +47,9 @@ class PriorClientHandler extends ClientPacketHandler {
             case PacketTypes.PlayerInventorySlot:
                 handled = this.handleInventorySlot(client, packet);
                 break;
-          case 147:
+            case 147:
                 handled = this.handleLoadoutSwitch(client, packet);
-              break;
+                break;
         }
         return handled;
     }
@@ -152,8 +152,9 @@ class PriorClientHandler extends ClientPacketHandler {
         }
         const old = TileSquare.parse(packet.data);
         const new_ = TileSquare1405.fromLatest(old);
+        const square = new_ != null ? TileSquare1405.toBuffer(new_) : null;
 
-        packet.data = new_ ?? null;
+        packet.data = square ?? null;
 
         return false;
     }
