@@ -14,7 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@darkgaming/rescript-terrariapacket": "popstarfreas/rescript-terrariapacket#2c7183ff12450c46d19d7bda7446d2825c2e3bdb",
+    "@darkgaming/rescript-terrariapacket": "popstarfreas/rescript-terrariapacket#3c76ed05a564ba465036734206e37b0df7851f98",
     "@popstarfreas/packetfactory": "^4.1.1",
     "dimensions": "npm:@popstarfreas/dimensions@5.6.0",
     "esbuild": "^0.12.8"

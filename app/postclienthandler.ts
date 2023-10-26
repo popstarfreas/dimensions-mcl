@@ -4,13 +4,12 @@ import Packet from 'dimensions/packet';
 import PacketTypes from 'dimensions/packettypes';
 import PacketWriter from 'dimensions/packets/packetwriter';
 import PacketReader from 'dimensions/packets/packetreader';
-import BitsByte from 'dimensions/datatypes/bitsbyte';
 import CL from './';
 import { is144 } from './is144';
-import * as TileSquare1405 from "@darkgaming/rescript-terrariapacket/src/packet/v1405/Packetv1405_TileSquareSend";
-import * as TileSquare from "@darkgaming/rescript-terrariapacket/src/packet/Packet_TileSquareSend";
+import * as TileSquare1405 from "@darkgaming/rescript-terrariapacket/src/packet/v1405/Packetv1405_TileSquareSend.bs";
+import * as TileSquare from "@darkgaming/rescript-terrariapacket/src/packet/Packet_TileSquareSend.bs";
 
-class PriorClientHandler extends ClientPacketHandler {
+class PostClientHandler extends ClientPacketHandler {
     protected _cl: CL;
 
     constructor(cl: CL) {
@@ -19,17 +18,19 @@ class PriorClientHandler extends ClientPacketHandler {
     }
 
     public handlePacket(client: Client, packet: Packet) {
-        if (this._cl.pcServers.has(client.server.name.toLowerCase())) {
+        if (this._cl.oldServers.has(client.server.name.toLowerCase())) {
+            let handled = false;
             switch (packet.packetType) {
                 case PacketTypes.ConnectRequest:
-                    return this.handleConnectRequestToPCServer(client, packet);
+                    return this.handleConnectRequestToOldServer(client, packet);
+                default:
+                    handled = this.handleIncompatiblePacket(client, packet);
+                    break;
             }
-            return false;
+            return handled;
         }
 
-        let handled = false;
-        handled = this.handleIncompatiblePacket(client, packet);
-        return handled;
+        return false;
     }
 
     private handleIncompatiblePacket(client: Client, packet: Packet) {
@@ -54,7 +55,7 @@ class PriorClientHandler extends ClientPacketHandler {
         return handled;
     }
 
-    private handleConnectRequestToPCServer(client: Client, packet: Packet) : boolean {
+    private handleConnectRequestToOldServer(client: Client, packet: Packet): boolean {
         const reader = new PacketReader(packet.data);
         const versionString = reader.readString();
         if (versionString.length !== 'Terraria000'.length) {
@@ -62,11 +63,11 @@ class PriorClientHandler extends ClientPacketHandler {
         }
 
         const version = parseInt(versionString.substring('Terraria'.length));
-        const fakeVersion = this._cl.config.fakeVersion;
-        if (version !== fakeVersion) {
+        const oldVersion = this._cl.config.oldVersion;
+        if (version !== oldVersion) {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
-                .packString(`Terraria${fakeVersion}`)
+                .packString(`Terraria${oldVersion}`)
                 .data
                 ;
         }
@@ -82,12 +83,12 @@ class PriorClientHandler extends ClientPacketHandler {
         if ((client as any).version === "unknown") {
             (client as any).version = version;
         }
-        let isPcVersion = false;
+        let isNewVersion = false;
         if (versionNumber && parseInt(versionNumber).toString() === versionNumber) {
-            isPcVersion = parseInt(versionNumber) >= 234; // 1.4.1.2 or above
+            isNewVersion = parseInt(versionNumber) >= 234; // 1.4.1.2 or above
         }
         console.log((client as any).version);
-        if (isPcVersion) {
+        if (isNewVersion) {
             packet.data = new PacketWriter()
                 .setType(PacketTypes.ConnectRequest)
                 .packString("Terraria233") // 1.4.1.1
@@ -99,7 +100,7 @@ class PriorClientHandler extends ClientPacketHandler {
 
     private handleInventorySlot(client: Client, packet: Packet) {
         const reader = new PacketReader(packet.data);
-        const id = reader.readByte();
+        const _id = reader.readByte();
         const slot = reader.readInt16();
         if (slot > 259) {
             packet.data = Buffer.alloc(0);
@@ -208,4 +209,4 @@ class PriorClientHandler extends ClientPacketHandler {
     }
 }
 
-export default PriorClientHandler;
+export default PostClientHandler;

@@ -1,4 +1,4 @@
 export default interface CLConfig {
-    fakeVersion: number;
-    pcServers: string[];
+    oldVersion: number;
+    oldServers: string[];
 }

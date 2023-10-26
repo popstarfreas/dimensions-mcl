@@ -2,8 +2,6 @@ import ListenServer from "dimensions/listenserver";
 import Extension from "dimensions/extension";
 import { requireNoCache } from "dimensions/utils";
 import PriorPacketHandler from "./priorpackethandler";
-import Client from "dimensions/client";
-import { Socket } from "net";
 import PostPacketHandler from "./postpackethandler";
 import CLConfig from "./clConfig";
 import { FSWatcher, watch } from "fs";
@@ -21,14 +19,14 @@ class CompatibilityLayer implements Extension {
     public priorPacketHandlers: PriorPacketHandler;
     public postPacketHandlers: PostPacketHandler;
     public listenServers: { [name: string]: ListenServer };
-    public pcServers: Set<string>;
+    public oldServers: Set<string>;
     public config: CLConfig;
 
     configWatcher: FSWatcher;
 
     constructor() {
-        this.name = "Compatibility Layer 1.4.1.2 and above -> 1.4.1.1. ";
-        this.version = "v1.2";
+        this.name = "Compatibility Layer 1.4.4.9 (client) and above -> 1.4.1.1 (server) ";
+        this.version = "v2.0";
         this.author = "popstarfreas";
         this.reloadable = false;
         this.priorPacketHandlers = new PriorPacketHandler(this);
@@ -37,17 +35,16 @@ class CompatibilityLayer implements Extension {
         this.config = this.processConfig(require('./clconfig.json'));
 
         this.configWatcher = watch(join(__dirname, "clconfig.json"), (eventType, filename) => {
-            if (eventType === "change")
-            {
+            if (eventType === "change") {
                 let configPath = join(__dirname, "clconfig.json");
                 this.config = this.processConfig(requireNoCache(configPath, require));
             }
         });
     }
 
-    private processConfig(config: CLConfig) : CLConfig {
-        this.pcServers = new Set(config.pcServers);
-        config.pcServers = [...this.pcServers];
+    private processConfig(config: CLConfig): CLConfig {
+        this.oldServers = new Set(config.oldServers);
+        config.oldServers = [...this.oldServers];
         return config;
     }
 
