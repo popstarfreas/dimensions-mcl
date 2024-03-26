@@ -1,0 +1,33 @@
+{
+  "name": "dimensions-nocmd",
+  "namespace": true,
+  "version": "0.1.0",
+  "sources": [
+    {
+      "dir": "src",
+      "subdirs": true
+    }
+  ],
+  "package-specs": {
+    "module": "commonjs",
+    "in-source": false,
+    "suffix": ".js"
+  },
+  "bsc-flags": [
+    "-open RescriptCore"
+  ],
+  "bs-dependencies": [
+    "rescript-dimensions",
+    "terraria-packet",
+    "@rescript/core",
+    "@popstarfreas/rescript-nodejs",
+    "@popstarfreas/packetfactory",
+    "@greenlabs/ppx-spice"
+  ],
+  "ppx-flags": [
+    [
+      "@greenlabs/ppx-spice/ppx",
+      "-uncurried"
+    ]
+  ]
+}

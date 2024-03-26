@@ -1,28 +1,26 @@
 {
-  "name": "dimensions-mcl",
-  "version": "1.1.0",
-  "repository": {
-    "type": "git",
-    "url": ""
-  },
-  "description": "",
+  "name": "dimensions-cl",
+  "version": "1.0.0",
   "main": "index.js",
+  "license": "MIT",
   "scripts": {
-    "build": "tsc -p ./",
-    "build:packed": "esbuild build/index.js --bundle --platform=node --external:*/clconfig.json --outfile=packed/index.js"
+    "build": "rescript",
+    "esbuild": "esbuild lib/js/src/Index.js --platform=node --bundle --outfile=dist/index.js"
   },
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@darkgaming/rescript-terrariapacket": "popstarfreas/rescript-terrariapacket#3c76ed05a564ba465036734206e37b0df7851f98",
-    "@popstarfreas/packetfactory": "^4.1.1",
-    "dimensions": "npm:@popstarfreas/dimensions@5.6.0",
-    "esbuild": "^0.12.8"
+    "@popstarfreas/packetfactory": "^6.0.1",
+    "@greenlabs/ppx-spice": "^0.2.1",
+    "@popstarfreas/rescript-nodejs": "git+https://github.com/popstarfreas/rescript-nodejs.git#f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7",
+    "@rescript/core": "^1.1.0",
+    "dimensions": "../dimensions-core/module",
+    "hjson": "^3.2.2",
+    "rescript": "^11.0.1",
+    "rescript-dimensions": "../rescript-dimensions",
+    "spice": "^1.0.2",
+    "terraria-packet": "github:popstarfreas/rescript-terrariapacket#de1430cc225f1188106a58661504975b28ac9dcc"
   },
+  "packageManager": "yarn@4.1.1",
   "devDependencies": {
-    "@types/node": "^12.0.0",
-    "@types/redis": "^0.12.36",
-    "@types/utf8": "^2.1.5",
-    "typescript": "^4.3.5"
+    "esbuild": "^0.20.2"
   }
 }
