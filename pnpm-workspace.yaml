@@ -1,0 +1,6 @@
+ignoredBuiltDependencies:
+  - '@greenlabs/ppx-spice'
+
+onlyBuiltDependencies:
+  - esbuild
+  - rescript
