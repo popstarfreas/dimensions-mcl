@@ -4,14 +4,16 @@ module Fs = NodeJs.Fs
 type t = {
   oldVersion: int,
   oldServers: Dict.t<string>,
+  allAreOldServers: bool,
 }
 
 let schema = S.object(s => {
   oldVersion: s.field("oldVersion", S.int),
   oldServers: s.field("oldServers", S.dict(S.string)),
+  allAreOldServers: s.field("allAreOldServers", S.bool),
 })
 
-let relativeLocation = "../configuration/cl.hjson"
+let relativeLocation = "../configuration/cl.yaml"
 
 type readResult = result<t, S.error>
 
@@ -63,10 +65,19 @@ let readFromFileSync = (): readResult => {
   }
 }
 
-let shouldConvertToFromServer = (config, serverName) => {
-  config.oldServers->Dict.get(String.toLowerCase(serverName))->Option.isSome
+let shouldConvertToFromServer = (
+  config,
+  serverName,
+  source: Dimensions.Extension.PacketSource.t,
+) => {
+  switch source {
+  | TerrariaServer =>
+    config.oldServers->Dict.get(String.toLowerCase(serverName))->Option.isSome ||
+      config.allAreOldServers
+  | Dimensions => false
+  }
 }
 
 let shouldConvertToFromClient = (config, version) => {
-  config.oldVersion == version
+  config.oldVersion < version
 }
