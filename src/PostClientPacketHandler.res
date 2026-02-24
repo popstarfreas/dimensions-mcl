@@ -17,9 +17,6 @@ let handleConnectRequest = (
     | Some(versionNumber) => {
         setClientVersion(client, versionNumber)
         Console.log2("Version number", versionNumber)
-        if versionNumber >= 315 {
-          setClientDimVersion(client, "Terraria279")
-        }
       }
     | None =>
       compatibilityLayer.logging->Dimensions.WinstonLogger.error(
@@ -53,23 +50,85 @@ let tryHandleVersion = (
   }
 }
 
+let unlockAllItems = (client: Dimensions.Client.t) => {
+  module WinstonLogger = Dimensions.WinstonLogger
+  module Client = Dimensions.Client
+  module Packet = TerrariaPacket.Packet
+  let team = Packet.PlayerTeamUpdate.toBuffer({
+    playerId: client.player.id,
+    team: 1,
+  })
+  switch team {
+  | Ok(team) => client->Client.sendDirect(team)
+  | Error({context, error}) =>
+    let error = JsExn.message(error)->Option.getOr("unknown")
+    client.logging->WinstonLogger.error(`Error creating team packet: ${context}: ${error}`)
+  }
+
+  for i in 1 to 6144 {
+    let unlock = Packet.NetModuleLoad.toBuffer({
+      CreativeUnlocksPlayerReport({
+        userId: client.player.id,
+        itemId: i,
+        researchedCount: 9999,
+      })
+    })
+    switch unlock {
+    | Ok(unlock) => client->Client.sendDirect(unlock)
+    | Error({context, error}) =>
+      let error = JsExn.message(error)->Option.getOr("unknown")
+      client.logging->WinstonLogger.error(`Error creating unlock packet: ${context}: ${error}`)
+    }
+  }
+
+  let team = Packet.PlayerTeamUpdate.toBuffer({
+    playerId: client.player.id,
+    team: 0,
+  })
+  switch team {
+  | Ok(team) => client->Client.sendDirect(team)
+  | Error({context, error}) =>
+    let error = JsExn.message(error)->Option.getOr("unknown")
+    client.logging->WinstonLogger.error(`Error creating team packet: ${context}: ${error}`)
+  }
+  Dimensions.Client.sendChatMessage(client, "Unlocked all items")
+}
+
+type command = {
+  name: string,
+  arguments: array<string>,
+}
+
+let parseCommandFromClientText = (commandId, message) => {
+  let message = switch commandId {
+  | "Say" => message
+  | command => `/${String.toLowerCase(command)} ${message}`
+  }
+
+  let isCommand = message->String.startsWith("/")
+  if isCommand {
+    let parts = message->String.split(" ")
+    let name = parts->Array.getUnsafe(0)->String.substring(~start=1)->String.toLowerCase
+    let arguments = parts->Array.slice(~start=1)
+    Some({name, arguments})
+  } else {
+    None
+  }
+}
+
 let handlePacket = (
   compatibilityLayer: CompatibilityLayer.t,
   rawPacket: Dimensions.RawPacket.t,
-  _client: Dimensions.Client.t,
+  client: Dimensions.Client.t,
 ): Dimensions.Extension.packetHandlerResult => {
   try {
     {
-      /* let packetType =
-      TerrariaPacket.PacketType.fromInt(Obj.magic(rawPacket.packetType))
-      ->Option.map(p => TerrariaPacket.PacketType.packetName(p))
-      ->Option.getOr("Unknown")*/
-
       let result = TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false)
       switch result {
       | Ok(ConnectRequest(connectRequest)) =>
         switch Lazy.get(connectRequest) {
         | Ok({version: _}) =>
+          Console.log("Patching version to 279")
           let buf = TerrariaPacket.Packet.ConnectRequest.toBuffer({
             version: "Terraria279",
           })
@@ -95,8 +154,8 @@ let handlePacket = (
       ~buffer=rawPacket.data,
       ~fromServer=false,
     )
-    switch result {
-    | Ok(PacketStructureIsSame) => AllowPacket
+    let handled = switch result {
+    | Ok(PacketStructureIsSame) => Dimensions.Extension.AllowPacket
     | Ok(DiscardAsNotExists) => BlockPacket
     | Ok(ConvertedToV1449(packet)) =>
       switch TerrariaPacket.PacketV1449.toBuffer(packet, false) {
@@ -135,6 +194,52 @@ let handlePacket = (
         BlockPacket
       }
     }
+
+    switch handled {
+    | BlockPacket => BlockPacket
+    | AllowPacket => {
+        let result = TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false)
+        switch result {
+        | Ok(NetModuleLoad(netModuleLoad)) =>
+          switch Lazy.get(netModuleLoad) {
+          | Ok(ClientText(commandId, message)) =>
+            switch parseCommandFromClientText(commandId, message) {
+            | Some({name}) =>
+              if (
+                String.startsWith(name, "j") ||
+                String.startsWith(name, "un") ||
+                String.startsWith(name, "cr")
+              ) {
+                let serverName = client.server.name->String.toLowerCase
+                switch serverName {
+                | "rift" | "items" | "specialitems" | "build" =>
+                  unlockAllItems(client)
+                  Dimensions.Extension.BlockPacket
+                | _ => Dimensions.Extension.AllowPacket
+                }
+              } else {
+                Dimensions.Extension.AllowPacket
+              }
+            | None => AllowPacket
+            }
+          | Ok(_) => AllowPacket
+          | Error({context, error}) => {
+              let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr(
+                  "unknown",
+                )}`
+              compatibilityLayer.logging->Dimensions.WinstonLogger.error(
+                `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+                    rawPacket.data,
+                    NodeJs.StringEncoding.hex,
+                  )}`,
+              )
+              BlockPacket
+            }
+          }
+        | _ => AllowPacket
+        }
+      }
+    }
   } catch {
   | e => {
       Console.error(e)
@@ -154,7 +259,7 @@ let clientPacketHandler = Dimensions.Extension.ClientPacketHandler.make((
     tryHandleVersion(compatibilityLayer, client, rawPacket)
     switch getClientVersion(client) {
     | Some(version) =>
-      if Config.shouldConvertToFromClient(config, version) {
+      if Config.shouldConvertToFromClient(config, version, client.server.name) {
         handlePacket(compatibilityLayer, rawPacket, client)
       } else {
         AllowPacket

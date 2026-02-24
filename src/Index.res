@@ -13,7 +13,15 @@ let constructor = (_extension: Dimensions.Extension.t, logging: Dimensions.Winst
   Config.readFromFile()
   ->Promise.thenResolve(config => {
     switch config {
-    | Ok(config) => compatibilityLayer.config = Loaded(config)
+    | Ok(config) => {
+        compatibilityLayer.config = Loaded(config)
+        if config.hotReloadEnabled {
+          Console.log("CompatibilityLayer: Hot reloading enabled")
+          compatibilityLayer.cleanupFsWatcher = Config.setupHotReload(~onConfigReload=config => {
+            compatibilityLayer.config = Loaded(config)
+          })
+        }
+      }
     | Error(e) => {
         logging->Dimensions.WinstonLogger.error(formatDecodeError(e))
         NodeJs.Process.process->NodeJs.Process.exit()
@@ -22,28 +30,6 @@ let constructor = (_extension: Dimensions.Extension.t, logging: Dimensions.Winst
   })
   ->ignore
   compatibilityLayer
-}
-
-type command = {
-  name: string,
-  arguments: array<string>,
-}
-
-let parseCommandFromClientText = (commandId, message) => {
-  let message = switch commandId {
-  | "Say" => message
-  | command => `/${String.toLowerCase(command)} ${message}`
-  }
-
-  let isCommand = message->String.startsWith("/")
-  if isCommand {
-    let parts = message->String.split(" ")
-    let name = parts->Array.getUnsafe(0)->String.substring(~start=1)->String.toLowerCase
-    let arguments = parts->Array.slice(~start=1)
-    Some({name, arguments})
-  } else {
-    None
-  }
 }
 
 let default: Dimensions.Extension.clsOfT<CompatibilityLayer.t> = Dimensions.Extension.make(

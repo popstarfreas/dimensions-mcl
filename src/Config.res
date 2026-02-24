@@ -5,12 +5,14 @@ type t = {
   oldVersion: int,
   oldServers: Dict.t<string>,
   allAreOldServers: bool,
+  hotReloadEnabled: bool,
 }
 
 let schema = S.object(s => {
   oldVersion: s.field("oldVersion", S.int),
   oldServers: s.field("oldServers", S.dict(S.string)),
   allAreOldServers: s.field("allAreOldServers", S.bool),
+  hotReloadEnabled: s.field("hotReloadEnabled", S.bool),
 })
 
 let relativeLocation = "../configuration/cl.yaml"
@@ -78,6 +80,54 @@ let shouldConvertToFromServer = (
   }
 }
 
-let shouldConvertToFromClient = (config, version) => {
-  config.oldVersion < version
+let shouldConvertToFromClient = (config, version, serverName) => {
+  config.oldVersion < version &&
+    (config.oldServers->Dict.get(String.toLowerCase(serverName))->Option.isSome ||
+      config.allAreOldServers)
+}
+
+let setupHotReload = (~onConfigReload) => {
+  let hotReloadTimeout = ref(None)
+  let currentPromise = ref(None)
+  let watcher = NodeJs.Fs.watch(
+    relativeLocation,
+    ~listener=(_eventType, _filename) => {
+      switch hotReloadTimeout.contents {
+      | Some(timeout) => clearTimeout(timeout)
+      | None => ()
+      }
+      hotReloadTimeout := Some(setTimeout(() => {
+            Console.log("Config file changed, reloading CompatibilityLayer config...")
+            let after = switch currentPromise.contents {
+            | Some(promise) => promise
+            | None => Promise.resolve()
+            }
+            currentPromise :=
+              Some(
+                after
+                ->Promise.then(readFromFile)
+                ->Promise.thenResolve(result => {
+                  switch result {
+                  | Ok(config) => {
+                      Console.log("CompatibilityLayer config reloaded")
+                      onConfigReload(config)
+                    }
+                  | Error(error) => Console.error(error)
+                  }
+                }),
+              )
+          }, 100))
+    },
+    (),
+  )
+
+  // Cleanup
+  () => {
+    switch hotReloadTimeout.contents {
+    | Some(timeout) => clearTimeout(timeout)
+    | None => ()
+    }
+    hotReloadTimeout.contents = None
+    NodeJs.Fs.FSWatcher.close(watcher)
+  }
 }

@@ -12,8 +12,8 @@ importers:
         specifier: ^7.0.0
         version: 7.2.1
       '@popstarfreas/rescript-nodejs':
-        specifier: git+https://github.com/popstarfreas/rescript-nodejs.git#f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
-        version: https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
+        specifier: git+https://github.com/popstarfreas/rescript-nodejs.git#6021460395cf37b5bc826c613769ce7128b3cc3b
+        version: https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/6021460395cf37b5bc826c613769ce7128b3cc3b
       '@rescript/language-server':
         specifier: ^1.70.0
         version: 1.70.0
@@ -33,8 +33,8 @@ importers:
         specifier: 11.0.0-alpha.4
         version: 11.0.0-alpha.4(rescript@12.0.0)
       terraria-packet:
-        specifier: github:popstarfreas/rescript-terrariapacket#cb864fe0416b9f4709c10d564cc5917b1cff9ab0
-        version: https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/cb864fe0416b9f4709c10d564cc5917b1cff9ab0(rescript@12.0.0)
+        specifier: github:popstarfreas/rescript-terrariapacket#9ba0a3ff257c3d1e93016e739e2a4c794423c6be
+        version: https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/9ba0a3ff257c3d1e93016e739e2a4c794423c6be(rescript@12.0.0)
       yaml:
         specifier: ^2.8.2
         version: 2.8.2
@@ -186,6 +186,13 @@ packages:
   '@popstarfreas/packetfactory@7.2.1':
     resolution: {integrity: sha512-gn4Z3vqKo7Y+3HshxjBT3i1m8+n/sTcsgUD+vqGdGQCBM4/iGX5W4FW5PRmYJtLoPsZY1VX3vBw0fMQCLfaaLw==}
 
+  '@popstarfreas/packetfactory@7.2.3':
+    resolution: {integrity: sha512-fiL/GV1QGiQJNYm+aXYUTSGoz71zv/LKt5gvv89EsBnQe0bLzrDsn+vE+cm1OEjaDb946j1pPSZ1EF7SnpWIGQ==}
+
+  '@popstarfreas/rescript-nodejs@https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/6021460395cf37b5bc826c613769ce7128b3cc3b':
+    resolution: {tarball: https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/6021460395cf37b5bc826c613769ce7128b3cc3b}
+    version: 16.1.0
+
   '@popstarfreas/rescript-nodejs@https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7':
     resolution: {tarball: https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7}
     version: 16.1.0
@@ -264,8 +271,8 @@ packages:
       rescript:
         optional: true
 
-  terraria-packet@https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/cb864fe0416b9f4709c10d564cc5917b1cff9ab0:
-    resolution: {tarball: https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/cb864fe0416b9f4709c10d564cc5917b1cff9ab0}
+  terraria-packet@https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/9ba0a3ff257c3d1e93016e739e2a4c794423c6be:
+    resolution: {tarball: https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/9ba0a3ff257c3d1e93016e739e2a4c794423c6be}
     version: 1.0.0
 
   vscode-jsonrpc@8.2.0:
@@ -368,6 +375,14 @@ snapshots:
     optionalDependencies:
       rescript: 12.0.0
 
+  '@popstarfreas/packetfactory@7.2.3':
+    dependencies:
+      '@popstarfreas/rescript-nodejs': https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
+    optionalDependencies:
+      rescript: 12.0.0
+
+  '@popstarfreas/rescript-nodejs@https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/6021460395cf37b5bc826c613769ce7128b3cc3b': {}
+
   '@popstarfreas/rescript-nodejs@https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7': {}
 
   '@rescript/core@1.6.1(rescript@12.0.0)':
@@ -444,9 +459,9 @@ snapshots:
     optionalDependencies:
       rescript: 12.0.0
 
-  terraria-packet@https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/cb864fe0416b9f4709c10d564cc5917b1cff9ab0(rescript@12.0.0):
+  terraria-packet@https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/9ba0a3ff257c3d1e93016e739e2a4c794423c6be(rescript@12.0.0):
     dependencies:
-      '@popstarfreas/packetfactory': 7.2.1
+      '@popstarfreas/packetfactory': 7.2.3
       '@rescript/core': 1.6.1(rescript@12.0.0)
       '@rescript/runtime': 12.1.0
     transitivePeerDependencies:
