@@ -54,21 +54,29 @@ let unlockAllItems = (client: Dimensions.Client.t) => {
   module WinstonLogger = Dimensions.WinstonLogger
   module Client = Dimensions.Client
   module Packet = TerrariaPacket.Packet
-  let team = Packet.PlayerTeamUpdate.toBuffer({
-    playerId: client.player.id,
-    team: 1,
-  })
-  switch team {
-  | Ok(team) => client->Client.sendDirect(team)
-  | Error({context, error}) =>
-    let error = JsExn.message(error)->Option.getOr("unknown")
-    client.logging->WinstonLogger.error(`Error creating team packet: ${context}: ${error}`)
+  let localPlayerId = client.player.id
+  let spoofSenderId = if localPlayerId == 255 { 254 } else { localPlayerId + 1 }
+
+  let sendTeamUpdate = (playerId, team) => {
+    let teamPacket = Packet.PlayerTeamUpdate.toBuffer({
+      playerId,
+      team,
+    })
+    switch teamPacket {
+    | Ok(teamPacket) => client->Client.sendDirect(teamPacket)
+    | Error({context, error}) =>
+      let error = JsExn.message(error)->Option.getOr("unknown")
+      client.logging->WinstonLogger.error(`Error creating team packet: ${context}: ${error}`)
+    }
   }
+
+  sendTeamUpdate(localPlayerId, 1)
+  sendTeamUpdate(spoofSenderId, 1)
 
   for i in 1 to 6144 {
     let unlock = Packet.NetModuleLoad.toBuffer({
       CreativeUnlocksPlayerReport({
-        userId: client.player.id,
+        userId: spoofSenderId,
         itemId: i,
         researchedCount: 9999,
       })
@@ -81,16 +89,8 @@ let unlockAllItems = (client: Dimensions.Client.t) => {
     }
   }
 
-  let team = Packet.PlayerTeamUpdate.toBuffer({
-    playerId: client.player.id,
-    team: 0,
-  })
-  switch team {
-  | Ok(team) => client->Client.sendDirect(team)
-  | Error({context, error}) =>
-    let error = JsExn.message(error)->Option.getOr("unknown")
-    client.logging->WinstonLogger.error(`Error creating team packet: ${context}: ${error}`)
-  }
+  sendTeamUpdate(localPlayerId, 0)
+  sendTeamUpdate(spoofSenderId, 0)
   Dimensions.Client.sendChatMessage(client, "Unlocked all items")
 }
 
@@ -150,30 +150,44 @@ let handlePacket = (
       }
     }
 
-    let result = TerrariaPacket.ParserConverter.convertToV1449IfNeeded(
-      ~buffer=rawPacket.data,
-      ~fromServer=false,
-    )
-    let handled = switch result {
-    | Ok(PacketStructureIsSame) => Dimensions.Extension.AllowPacket
-    | Ok(DiscardAsNotExists) => BlockPacket
-    | Ok(ConvertedToV1449(packet)) =>
-      switch TerrariaPacket.PacketV1449.toBuffer(packet, false) {
-      | Ok(buffer) => {
-          rawPacket.data = buffer
-          AllowPacket
+    if NpcBuffFilter.inspectClientPacket(rawPacket, client) == BlockPacket {
+      BlockPacket
+    } else {
+      let result = TerrariaPacket.ParserConverter.convertToV1449IfNeeded(
+        ~buffer=rawPacket.data,
+        ~fromServer=false,
+      )
+      let handled = switch result {
+      | Ok(PacketStructureIsSame) => Dimensions.Extension.AllowPacket
+      | Ok(DiscardAsNotExists) => BlockPacket
+      | Ok(ConvertedToV1449(packet)) =>
+        switch TerrariaPacket.PacketV1449.toBuffer(packet, false) {
+        | Ok(buffer) => {
+            rawPacket.data = buffer
+            AllowPacket
+          }
+        | NotImplemented => {
+            compatibilityLayer.logging->Dimensions.WinstonLogger.error(
+              `Failed to convert packet to latest version. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+                  rawPacket.data,
+                  NodeJs.StringEncoding.hex,
+                )}`,
+            )
+            BlockPacket
+          }
+        | Error({context, error}) => {
+            let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
+            compatibilityLayer.logging->Dimensions.WinstonLogger.error(
+              `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+                  rawPacket.data,
+                  NodeJs.StringEncoding.hex,
+                )}`,
+            )
+            BlockPacket
+          }
         }
-      | NotImplemented => {
-          compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-            `Failed to convert packet to latest version. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-                rawPacket.data,
-                NodeJs.StringEncoding.hex,
-              )}`,
-          )
-          BlockPacket
-        }
-      | Error({context, error}) => {
-          let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
+      | Error(err) => {
+          let err = TerrariaPacket.IParser.ParseError.toDisplayString(err)
           compatibilityLayer.logging->Dimensions.WinstonLogger.error(
             `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
                 rawPacket.data,
@@ -183,60 +197,50 @@ let handlePacket = (
           BlockPacket
         }
       }
-    | Error(err) => {
-        let err = TerrariaPacket.IParser.ParseError.toDisplayString(err)
-        compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-              rawPacket.data,
-              NodeJs.StringEncoding.hex,
-            )}`,
-        )
-        BlockPacket
-      }
-    }
 
-    switch handled {
-    | BlockPacket => BlockPacket
-    | AllowPacket => {
-        let result = TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false)
-        switch result {
-        | Ok(NetModuleLoad(netModuleLoad)) =>
-          switch Lazy.get(netModuleLoad) {
-          | Ok(ClientText(commandId, message)) =>
-            switch parseCommandFromClientText(commandId, message) {
-            | Some({name}) =>
-              if (
-                String.startsWith(name, "j") ||
-                String.startsWith(name, "un") ||
-                String.startsWith(name, "cr")
-              ) {
-                let serverName = client.server.name->String.toLowerCase
-                switch serverName {
-                | "rift" | "items" | "specialitems" | "build" =>
-                  unlockAllItems(client)
-                  Dimensions.Extension.BlockPacket
-                | _ => Dimensions.Extension.AllowPacket
+      switch handled {
+      | BlockPacket => BlockPacket
+      | AllowPacket => {
+          let result = TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false)
+          switch result {
+          | Ok(NetModuleLoad(netModuleLoad)) =>
+            switch Lazy.get(netModuleLoad) {
+            | Ok(ClientText(commandId, message)) =>
+              switch parseCommandFromClientText(commandId, message) {
+              | Some({name}) =>
+                if (
+                  String.startsWith(name, "j") ||
+                  String.startsWith(name, "un") ||
+                  String.startsWith(name, "cr")
+                ) {
+                  let serverName = client.server.name->String.toLowerCase
+                  switch serverName {
+                  | "rift" | "items" | "specialitems" | "build" =>
+                    unlockAllItems(client)
+                    Dimensions.Extension.BlockPacket
+                  | _ => Dimensions.Extension.AllowPacket
+                  }
+                } else {
+                  Dimensions.Extension.AllowPacket
                 }
-              } else {
-                Dimensions.Extension.AllowPacket
+              | None => AllowPacket
               }
-            | None => AllowPacket
+            | Ok(_) => AllowPacket
+            | Error({context, error}) => {
+                let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr(
+                    "unknown",
+                  )}`
+                compatibilityLayer.logging->Dimensions.WinstonLogger.error(
+                  `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+                      rawPacket.data,
+                      NodeJs.StringEncoding.hex,
+                    )}`,
+                )
+                BlockPacket
+              }
             }
-          | Ok(_) => AllowPacket
-          | Error({context, error}) => {
-              let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr(
-                  "unknown",
-                )}`
-              compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-                `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-                    rawPacket.data,
-                    NodeJs.StringEncoding.hex,
-                  )}`,
-              )
-              BlockPacket
-            }
+          | _ => AllowPacket
           }
-        | _ => AllowPacket
         }
       }
     }

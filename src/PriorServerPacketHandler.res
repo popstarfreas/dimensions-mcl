@@ -8,6 +8,12 @@ external itemDropPositions: Dimensions.TerrariaServer.t => option<array<position
 @set
 external setItemDropPositions: (Dimensions.TerrariaServer.t, array<position>) => unit =
   "clItemDropPositions"
+@get
+external playerTeamsByPlayerId: Dimensions.TerrariaServer.t => option<array<int>> =
+  "clPlayerTeamsByPlayerId"
+@set
+external setPlayerTeamsByPlayerId: (Dimensions.TerrariaServer.t, array<int>) => unit =
+  "clPlayerTeamsByPlayerId"
 
 let getOrInitItemDropPositions = (terrariaServer: Dimensions.TerrariaServer.t) => {
   switch itemDropPositions(terrariaServer) {
@@ -17,6 +23,52 @@ let getOrInitItemDropPositions = (terrariaServer: Dimensions.TerrariaServer.t) =
       terrariaServer->setItemDropPositions(arr)
       arr
     }
+  }
+}
+
+let syncInventorySlotCombatCorrelationFromServer = (
+  terrariaServer: Dimensions.TerrariaServer.t,
+  playerId: int,
+  slot: int,
+  itemType: int,
+) => {
+  let client = terrariaServer.client
+  if client.player.id == playerId {
+    let state = NpcBuffFilter.getOrInitCombatCorrelation(client)
+    NpcBuffFilter.recordInventoryItemType(state, slot, itemType)
+  }
+}
+
+let getOrInitPlayerTeamsByPlayerId = (terrariaServer: Dimensions.TerrariaServer.t) => {
+  switch playerTeamsByPlayerId(terrariaServer) {
+  | Some(teams) => teams
+  | None => {
+      let teams = []
+      terrariaServer->setPlayerTeamsByPlayerId(teams)
+      teams
+    }
+  }
+}
+
+let recordPlayerTeamFromServer = (
+  terrariaServer: Dimensions.TerrariaServer.t,
+  playerId: int,
+  team: int,
+) => {
+  if playerId >= 0 && team >= 0 {
+    let teams = getOrInitPlayerTeamsByPlayerId(terrariaServer)
+    teams[playerId] = team
+  }
+}
+
+let applyCachedPlayerTeamToSpawn = (
+  terrariaServer: Dimensions.TerrariaServer.t,
+  packet: TerrariaPacket.Packet.t,
+  playerSpawn: TerrariaPacket.Packet.PlayerSpawn.t,
+) => {
+  switch getOrInitPlayerTeamsByPlayerId(terrariaServer)[playerSpawn.playerId] {
+  | Some(team) => TerrariaPacket.Packet.PlayerSpawn({...playerSpawn, team})
+  | None => packet
   }
 }
 
@@ -74,6 +126,20 @@ let handlePacket = (
         )
       }
     }
+  | Ok(TerrariaPacket.PacketV1449.LazyPacket.PlayerTeam(playerTeam)) =>
+    switch Lazy.get(playerTeam) {
+    | Ok(playerTeam) =>
+      recordPlayerTeamFromServer(terrariaServer, playerTeam.playerId, playerTeam.team)
+    | Error({context, error}) => {
+        let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
+        compatibilityLayer.logging->Dimensions.WinstonLogger.error(
+          `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+              rawPacket.data,
+              NodeJs.StringEncoding.hex,
+            )}`,
+        )
+      }
+    }
   | Ok(TerrariaPacket.PacketV1449.LazyPacket.ItemDropUpdate(itemDropUpdate)) =>
     switch Lazy.get(itemDropUpdate) {
     | Ok(itemDropUpdate) =>
@@ -105,6 +171,18 @@ let handlePacket = (
         ->Option.getOr("Unknown")*/
     AllowPacket
   | Ok(ConvertedToLatestVersion(packet)) =>
+    switch packet {
+    | PlayerInventorySlot(playerInventorySlot) =>
+      syncInventorySlotCombatCorrelationFromServer(
+        terrariaServer,
+        playerInventorySlot.playerId,
+        playerInventorySlot.slot,
+        playerInventorySlot.itemType,
+      )
+    | PlayerTeamUpdate(playerTeamUpdate) =>
+      recordPlayerTeamFromServer(terrariaServer, playerTeamUpdate.playerId, playerTeamUpdate.team)
+    | _ => ()
+    }
     let packet = switch packet {
     | ItemOwner(itemOwner) =>
       let position = getOrInitItemDropPositions(terrariaServer)[itemOwner.itemDropId]
@@ -119,6 +197,7 @@ let handlePacket = (
         })
       | None => packet
       }
+    | PlayerSpawn(playerSpawn) => applyCachedPlayerTeamToSpawn(terrariaServer, packet, playerSpawn)
     | _ => packet
     }
     switch TerrariaPacket.Packet.toBuffer(packet, true) {
