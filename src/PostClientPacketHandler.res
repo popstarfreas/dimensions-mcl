@@ -20,7 +20,7 @@ let handleConnectRequest = (
       }
     | None =>
       compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-        `Failed to parse version number from ConnectRequest. Contents: { version: ${connectRequest.version} }`,
+        `Failed to parse version number from client-sent ConnectRequest. Contents: { version: ${connectRequest.version} }`,
       )
     }
   }
@@ -39,7 +39,7 @@ let tryHandleVersion = (
     | Error({context, error}) => {
         let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
         compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+          `Failed to parse client-sent ConnectRequest packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
               rawPacket.data,
               NodeJs.StringEncoding.hex,
             )}`,
@@ -139,7 +139,7 @@ let handlePacket = (
         | Error({context, error}) => {
             let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
             compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-              `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+              `Failed to parse client-sent ConnectRequest packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
                   rawPacket.data,
                   NodeJs.StringEncoding.hex,
                 )}`,
@@ -168,7 +168,7 @@ let handlePacket = (
           }
         | NotImplemented => {
             compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-              `Failed to convert packet to latest version. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+              `Failed to encode converted client-sent packet to v1449. Packet: ${NodeJs.Buffer.toStringWithEncoding(
                   rawPacket.data,
                   NodeJs.StringEncoding.hex,
                 )}`,
@@ -178,7 +178,7 @@ let handlePacket = (
         | Error({context, error}) => {
             let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
             compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-              `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+              `Failed to encode converted client-sent packet to v1449. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
                   rawPacket.data,
                   NodeJs.StringEncoding.hex,
                 )}`,
@@ -189,7 +189,7 @@ let handlePacket = (
       | Error(err) => {
           let err = TerrariaPacket.IParser.ParseError.toDisplayString(err)
           compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-            `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+            `Failed to convert client-sent packet to v1449. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
                 rawPacket.data,
                 NodeJs.StringEncoding.hex,
               )}`,
@@ -231,7 +231,7 @@ let handlePacket = (
                     "unknown",
                   )}`
                 compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-                  `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+                  `Failed to parse client-sent NetModuleLoad packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
                       rawPacket.data,
                       NodeJs.StringEncoding.hex,
                     )}`,

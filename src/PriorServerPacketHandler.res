@@ -14,6 +14,10 @@ external playerTeamsByPlayerId: Dimensions.TerrariaServer.t => option<array<int>
 @set
 external setPlayerTeamsByPlayerId: (Dimensions.TerrariaServer.t, array<int>) => unit =
   "clPlayerTeamsByPlayerId"
+@get
+external worldGameMode: Dimensions.TerrariaServer.t => option<int> = "clWorldGameMode"
+@set
+external setWorldGameMode: (Dimensions.TerrariaServer.t, int) => unit = "clWorldGameMode"
 
 let getOrInitItemDropPositions = (terrariaServer: Dimensions.TerrariaServer.t) => {
   switch itemDropPositions(terrariaServer) {
@@ -61,6 +65,36 @@ let recordPlayerTeamFromServer = (
   }
 }
 
+let recordWorldGameModeFromServer = (
+  terrariaServer: Dimensions.TerrariaServer.t,
+  gameMode: int,
+) => {
+  if gameMode >= 0 {
+    terrariaServer->setWorldGameMode(gameMode)
+  }
+}
+
+let difficultyMultiplierFromGameMode = (gameMode: int): option<float> =>
+  switch gameMode {
+  | 1 => Some(2.0)
+  | 2 => Some(3.0)
+  | _ => None
+  }
+
+let getCachedDifficultyMultiplier = (terrariaServer: Dimensions.TerrariaServer.t): option<float> => {
+  switch worldGameMode(terrariaServer) {
+  | Some(gameMode) => difficultyMultiplierFromGameMode(gameMode)
+  | None => None
+  }
+}
+
+let shouldInjectNpcDifficulty = (difficulty: option<float>): bool => {
+  switch difficulty {
+  | Some(value) => value <= 1.0
+  | None => true
+  }
+}
+
 let applyCachedPlayerTeamToSpawn = (
   terrariaServer: Dimensions.TerrariaServer.t,
   packet: TerrariaPacket.Packet.t,
@@ -104,7 +138,7 @@ let handlePacket = (
     | Error({context, error}) => {
         let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
         compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+          `Failed to parse server-sent v1449 PlayerSlotSet packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
               rawPacket.data,
               NodeJs.StringEncoding.hex,
             )}`,
@@ -119,7 +153,7 @@ let handlePacket = (
     | Error({context, error}) => {
         let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
         compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+          `Failed to parse server-sent v1449 ItemDropInstancedUpdate packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
               rawPacket.data,
               NodeJs.StringEncoding.hex,
             )}`,
@@ -133,7 +167,7 @@ let handlePacket = (
     | Error({context, error}) => {
         let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
         compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+          `Failed to parse server-sent v1449 PlayerTeam packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
               rawPacket.data,
               NodeJs.StringEncoding.hex,
             )}`,
@@ -148,7 +182,20 @@ let handlePacket = (
     | Error({context, error}) => {
         let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
         compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+          `Failed to parse server-sent v1449 ItemDropUpdate packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+              rawPacket.data,
+              NodeJs.StringEncoding.hex,
+            )}`,
+        )
+      }
+    }
+  | Ok(TerrariaPacket.PacketV1449.LazyPacket.WorldInfo(worldInfo)) =>
+    switch Lazy.get(worldInfo) {
+    | Ok(worldInfo) => recordWorldGameModeFromServer(terrariaServer, worldInfo.gameMode)
+    | Error({context, error}) => {
+        let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
+        compatibilityLayer.logging->Dimensions.WinstonLogger.error(
+          `Failed to parse server-sent v1449 WorldInfo packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
               rawPacket.data,
               NodeJs.StringEncoding.hex,
             )}`,
@@ -171,7 +218,20 @@ let handlePacket = (
         ->Option.getOr("Unknown")*/
     AllowPacket
   | Ok(ConvertedToLatestVersion(packet)) =>
-    switch packet {
+    let packet = switch packet {
+    | NpcUpdate(npcUpdate) =>
+      switch getCachedDifficultyMultiplier(terrariaServer) {
+      | Some(difficultyMultiplier) =>
+        if (
+          NpcDifficultyScaling.needsDifficultyScaling(npcUpdate.npcTypeId) &&
+          shouldInjectNpcDifficulty(npcUpdate.difficulty)
+        ) {
+          TerrariaPacket.Packet.NpcUpdate({...npcUpdate, difficulty: Some(difficultyMultiplier)})
+        } else {
+          packet
+        }
+      | None => packet
+      }
     | PlayerInventorySlot(playerInventorySlot) =>
       syncInventorySlotCombatCorrelationFromServer(
         terrariaServer,
@@ -179,9 +239,14 @@ let handlePacket = (
         playerInventorySlot.slot,
         playerInventorySlot.itemType,
       )
+      packet
     | PlayerTeamUpdate(playerTeamUpdate) =>
       recordPlayerTeamFromServer(terrariaServer, playerTeamUpdate.playerId, playerTeamUpdate.team)
-    | _ => ()
+      packet
+    | WorldInfo(worldInfo) =>
+      recordWorldGameModeFromServer(terrariaServer, worldInfo.gameMode)
+      packet
+    | _ => packet
     }
     let packet = switch packet {
     | ItemOwner(itemOwner) =>
@@ -207,7 +272,7 @@ let handlePacket = (
       }
     | NotImplemented => {
         compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to convert packet to latest version. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+          `Failed to encode converted server-sent packet to latest version. Packet: ${NodeJs.Buffer.toStringWithEncoding(
               rawPacket.data,
               NodeJs.StringEncoding.hex,
             )}`,
@@ -217,7 +282,7 @@ let handlePacket = (
     | Error({context, error}) => {
         let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
         compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+          `Failed to encode converted server-sent packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
               rawPacket.data,
               NodeJs.StringEncoding.hex,
             )}`,
@@ -228,7 +293,7 @@ let handlePacket = (
   | Error(err) => {
       let err = TerrariaPacket.IParser.ParseError.toDisplayString(err)
       compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-        `Failed to convert packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
+        `Failed to convert server-sent packet to latest version. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
             rawPacket.data,
             NodeJs.StringEncoding.hex,
           )}`,
