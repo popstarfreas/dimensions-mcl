@@ -55,7 +55,11 @@ let unlockAllItems = (client: Dimensions.Client.t) => {
   module Client = Dimensions.Client
   module Packet = TerrariaPacket.Packet
   let localPlayerId = client.player.id
-  let spoofSenderId = if localPlayerId == 255 { 254 } else { localPlayerId + 1 }
+  let spoofSenderId = if localPlayerId == 255 {
+    254
+  } else {
+    localPlayerId + 1
+  }
 
   let sendTeamUpdate = (playerId, team) => {
     let teamPacket = Packet.PlayerTeamUpdate.toBuffer({
