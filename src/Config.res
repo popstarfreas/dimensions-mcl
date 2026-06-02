@@ -24,6 +24,10 @@ module Yaml = {
   @module("yaml") external stringify: JSON.t => string = "stringify"
 }
 
+module PromiseExt = {
+  @send external catchWith: (Promise.t<'a>, JsExn.t => 'a) => Promise.t<'a> = "catch"
+}
+
 let readFromFile = (): Promise.t<readResult> => {
   Fs.readFile(relativeLocation, ())->Promise.then(buffer => {
     try {
@@ -114,6 +118,10 @@ let setupHotReload = (~onConfigReload) => {
                     }
                   | Error(error) => Console.error(error)
                   }
+                })
+                ->PromiseExt.catchWith(error => {
+                  Console.error("Failed to reload CompatibilityLayer config")
+                  Console.error(error)
                 }),
               )
           }, 100))
