@@ -33,9 +33,9 @@ let constructor = (_extension: Dimensions.Extension.t, logging: Dimensions.Winst
 }
 
 let default: Dimensions.Extension.clsOfT<CompatibilityLayer.t> = Dimensions.Extension.make(
-  ~name="Compatibility Layer 1.4.5 (client) and above -> 1.4.4.9 (server) ",
+  ~name="Compatibility Layer 1.4.5.7 (client) -> 1.4.5.6 (server)",
   ~author="popstarfreas",
-  ~version="v5.0",
+  ~version="v6.0",
   ~constructor,
   ~priorPacketHandler={
     serverHandler: PriorServerPacketHandler.serverPacketHandler,

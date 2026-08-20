@@ -1,4 +1,4 @@
-# Dimensions v1.4.5.x Compatibility Layer
+# Dimensions v1.4.5.7 Compatibility Layer
 ## Current State
 Considered stable but does not provide complete patching.
 
@@ -6,7 +6,9 @@ Considered stable but does not provide complete patching.
 Go to releases, download the js file (its a bundle of this extension) and copy into your dimensions folder under this directory: `./build/extensions/dimensions-cl/index.mjs`
 
 ## How does it work?
-When a player first connects, their version is checked. If it matches v1.4.5.0 or above the extension will translate their packets to v1.4.4.9. For servers it will translate v1.4.4.9 packets to v1.4.5.x when sending to the client.
+When a 1.4.5.7 client connects to a configured 1.4.5.6 server, the extension rewrites the handshake from protocol 325 to protocol 319 and converts changed packets in both directions.
+
+Set `oldVersion` to `319` in `configuration/cl.yaml`, then select the 1.4.5.6 servers with `oldServers` or `allAreOldServers`.
 
 ## How to build this extension
 **This repo is currently not fully buildable due to some missing deps**

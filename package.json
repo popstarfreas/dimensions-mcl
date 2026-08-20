@@ -17,7 +17,7 @@
     "rescript": "^12.0.0",
     "rescript-dimensions": "../rescript-dimensions",
     "sury": "11.0.0-alpha.4",
-    "terraria-packet": "github:popstarfreas/rescript-terrariapacket#b8a0d9d67b4fe7c29bacebd11a5ba68a9c57dcaa",
+    "terraria-packet": "github:popstarfreas/rescript-terrariapacket#07bc77f411cefe074336ab9a17e8f6f32dfc614d",
     "yaml": "^2.8.2"
   },
   "devDependencies": {
