@@ -28,6 +28,19 @@ module PromiseExt = {
   @send external catchWith: (Promise.t<'a>, JsExn.t => 'a) => Promise.t<'a> = "catch"
 }
 
+module FsWatch = {
+  type t
+  type eventType
+  type filename
+
+  @module("node:fs") external watch: (
+    string,
+    ~listener: (eventType, filename) => unit,
+    unit,
+  ) => t = "watch"
+  @send external close: t => unit = "close"
+}
+
 let readFromFile = (): Promise.t<readResult> => {
   Fs.readFile(relativeLocation, ())->Promise.then(buffer => {
     try {
@@ -75,12 +88,17 @@ let shouldConvertToFromServer = (
   config,
   serverName,
   source: Dimensions.Extension.PacketSource.t,
+  clientVersion,
 ) => {
-  switch source {
-  | TerrariaServer =>
-    config.oldServers->Dict.get(String.toLowerCase(serverName))->Option.isSome ||
-      config.allAreOldServers
-  | Dimensions => false
+  switch clientVersion {
+  | Some(version) if version <= config.oldVersion => false
+  | _ =>
+    switch source {
+    | TerrariaServer =>
+      config.oldServers->Dict.get(String.toLowerCase(serverName))->Option.isSome ||
+        config.allAreOldServers
+    | Dimensions => false
+    }
   }
 }
 
@@ -93,7 +111,7 @@ let shouldConvertToFromClient = (config, version, serverName) => {
 let setupHotReload = (~onConfigReload) => {
   let hotReloadTimeout = ref(None)
   let currentPromise = ref(None)
-  let watcher = NodeJs.Fs.watch(
+  let watcher = FsWatch.watch(
     relativeLocation,
     ~listener=(_eventType, _filename) => {
       switch hotReloadTimeout.contents {
@@ -136,6 +154,6 @@ let setupHotReload = (~onConfigReload) => {
     | None => ()
     }
     hotReloadTimeout.contents = None
-    NodeJs.Fs.FSWatcher.close(watcher)
+    FsWatch.close(watcher)
   }
 }

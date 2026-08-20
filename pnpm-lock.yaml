@@ -12,8 +12,8 @@ importers:
         specifier: ^7.0.0
         version: 7.2.1
       '@popstarfreas/rescript-nodejs':
-        specifier: git+https://github.com/popstarfreas/rescript-nodejs.git#6021460395cf37b5bc826c613769ce7128b3cc3b
-        version: https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/6021460395cf37b5bc826c613769ce7128b3cc3b
+        specifier: git+https://github.com/popstarfreas/rescript-nodejs.git#f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
+        version: https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
       '@rescript/language-server':
         specifier: ^1.70.0
         version: 1.70.0
@@ -188,10 +188,6 @@ packages:
 
   '@popstarfreas/packetfactory@7.2.3':
     resolution: {integrity: sha512-fiL/GV1QGiQJNYm+aXYUTSGoz71zv/LKt5gvv89EsBnQe0bLzrDsn+vE+cm1OEjaDb946j1pPSZ1EF7SnpWIGQ==}
-
-  '@popstarfreas/rescript-nodejs@https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/6021460395cf37b5bc826c613769ce7128b3cc3b':
-    resolution: {tarball: https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/6021460395cf37b5bc826c613769ce7128b3cc3b}
-    version: 16.1.0
 
   '@popstarfreas/rescript-nodejs@https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7':
     resolution: {tarball: https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7}
@@ -380,8 +376,6 @@ snapshots:
       '@popstarfreas/rescript-nodejs': https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
     optionalDependencies:
       rescript: 12.0.0
-
-  '@popstarfreas/rescript-nodejs@https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/6021460395cf37b5bc826c613769ce7128b3cc3b': {}
 
   '@popstarfreas/rescript-nodejs@https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7': {}
 

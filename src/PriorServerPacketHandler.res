@@ -1,3 +1,5 @@
+@get external getClientVersion: Dimensions.Client.t => option<int> = "clVersion"
+
 let handlePacket = (
   compatibilityLayer: CompatibilityLayer.t,
   rawPacket: Dimensions.RawPacket.t,
@@ -62,7 +64,12 @@ let serverPacketHandler = Dimensions.Extension.TerrariaServerPacketHandler.make(
 ) => {
   switch compatibilityLayer.config {
   | Loaded(config) =>
-    if Config.shouldConvertToFromServer(config, terrariaServer.name, source) {
+    if Config.shouldConvertToFromServer(
+      config,
+      terrariaServer.name,
+      source,
+      getClientVersion(terrariaServer.client),
+    ) {
       handlePacket(compatibilityLayer, rawPacket)
     } else {
       AllowPacket
