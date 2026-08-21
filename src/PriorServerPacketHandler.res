@@ -44,6 +44,31 @@ let translateNpcGeneration = (terrariaServer, packet: TerrariaPacket.Packet.t) =
   }
 }
 
+let translateProjectileKey = (terrariaServer, packet: TerrariaPacket.Packet.t) => {
+  let tracker = ProjectileKeyTracker.forServer(terrariaServer)
+  switch packet {
+  | ProjectileSync(projectileSync) => {
+      let convertedKey = projectileSync.projectileKey
+      let projectileKey = tracker->ProjectileKeyTracker.keyForSync(
+        ~spawner=convertedKey.spawner,
+        ~index=convertedKey.index,
+        ~preferredGeneration=convertedKey.generation,
+      )
+      TerrariaPacket.Packet.ProjectileSync({...projectileSync, projectileKey})
+    }
+  | ProjectileDestroy(projectileDestroy) => {
+      let convertedKey = projectileDestroy.projectileKey
+      let projectileKey = tracker->ProjectileKeyTracker.keyForDestroy(
+        ~spawner=convertedKey.spawner,
+        ~index=convertedKey.index,
+        ~preferredGeneration=convertedKey.generation,
+      )
+      TerrariaPacket.Packet.ProjectileDestroy({...projectileDestroy, projectileKey})
+    }
+  | packet => packet
+  }
+}
+
 let handlePacket = (
   compatibilityLayer: CompatibilityLayer.t,
   terrariaServer: Dimensions.TerrariaServer.t,
@@ -63,6 +88,7 @@ let handlePacket = (
   | Ok(DiscardAsNotExists) => BlockPacket
   | Ok(ConvertedToLatest(packet)) =>
     let packet = translateNpcGeneration(terrariaServer, packet)
+    let packet = translateProjectileKey(terrariaServer, packet)
     switch TerrariaPacket.Packet.toBuffer(packet, true) {
     | Ok(buffer) => {
         rawPacket.data = buffer

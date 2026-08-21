@@ -34,6 +34,37 @@ let sendNpcDamageAck = (
   }
 }
 
+type clientProjectileAction =
+  | RememberProjectile(TerrariaPacket.ProjectileKey.t)
+  | DestroyProjectile(TerrariaPacket.ProjectileKey.t)
+
+let getClientProjectileAction = (rawPacket: Dimensions.RawPacket.t) => {
+  switch TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false) {
+  | Ok(ProjectileSync(projectileSync)) =>
+    switch Lazy.get(projectileSync) {
+    | Ok(projectileSync) => Some(RememberProjectile(projectileSync.projectileKey))
+    | Error(_) => None
+    }
+  | Ok(ProjectileDestroy(projectileDestroy)) =>
+    switch Lazy.get(projectileDestroy) {
+    | Ok(projectileDestroy) => Some(DestroyProjectile(projectileDestroy.projectileKey))
+    | Error(_) => None
+    }
+  | _ => None
+  }
+}
+
+let applyClientProjectileAction = (client: Dimensions.Client.t, action) => {
+  let tracker = ProjectileKeyTracker.forServer(client.server)
+  switch action {
+  | Some(RememberProjectile(projectileKey)) =>
+    tracker->ProjectileKeyTracker.rememberClientKey(projectileKey)
+  | Some(DestroyProjectile(projectileKey)) =>
+    tracker->ProjectileKeyTracker.markClientKeyDestroyed(projectileKey)
+  | None => ()
+  }
+}
+
 let handleConnectRequest = (
   compatibilityLayer: CompatibilityLayer.t,
   client,
@@ -88,6 +119,7 @@ let handlePacket = (
   rawPacket: Dimensions.RawPacket.t,
 ): Dimensions.Extension.packetHandlerResult => {
   try {
+    let clientProjectileAction = getClientProjectileAction(rawPacket)
     {
       let result = TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false)
       switch result {
@@ -134,6 +166,7 @@ let handlePacket = (
             | NpcStrike(_) => sendNpcDamageAck(compatibilityLayer, client)
             | _ => ()
             }
+            applyClientProjectileAction(client, clientProjectileAction)
             AllowPacket
           }
         | NotImplemented => {
