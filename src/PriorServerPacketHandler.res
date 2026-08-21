@@ -1,7 +1,52 @@
 @get external getClientVersion: Dimensions.Client.t => option<int> = "clVersion"
+@get external getNpcGenerationTracker: Dimensions.TerrariaServer.t => option<
+  NpcGenerationTracker.t,
+> = "clNpcGenerationTracker"
+@set external setNpcGenerationTracker: (
+  Dimensions.TerrariaServer.t,
+  NpcGenerationTracker.t,
+) => unit = "clNpcGenerationTracker"
+
+let npcGenerationTrackerForServer = server =>
+  switch getNpcGenerationTracker(server) {
+  | Some(tracker) => tracker
+  | None => {
+      let tracker = NpcGenerationTracker.make()
+      setNpcGenerationTracker(server, tracker)
+      tracker
+    }
+  }
+
+let npcIsActive = (npcUpdate: TerrariaPacket.Packet.NpcUpdate.t) =>
+  npcUpdate.npcTypeId != 0 &&
+  switch npcUpdate.life {
+  | Max => true
+  | Byte(life) | Int16(life) | Int32(life) => life > 0
+  }
+
+let translateNpcGeneration = (terrariaServer, packet: TerrariaPacket.Packet.t) => {
+  let tracker = npcGenerationTrackerForServer(terrariaServer)
+  switch packet {
+  | NpcUpdate(npcUpdate) => {
+      let generation = tracker->NpcGenerationTracker.generationForUpdate(
+        ~slotId=npcUpdate.npcSlotId,
+        ~active=npcIsActive(npcUpdate),
+        ~forceNew=npcUpdate.spawnNeedsSyncing,
+      )
+      TerrariaPacket.Packet.NpcUpdate({...npcUpdate, generation})
+    }
+  | NpcStrike(npcStrike) =>
+    TerrariaPacket.Packet.NpcStrike({
+      ...npcStrike,
+      generation: tracker->NpcGenerationTracker.generationForSlot(npcStrike.npcSlotId),
+    })
+  | packet => packet
+  }
+}
 
 let handlePacket = (
   compatibilityLayer: CompatibilityLayer.t,
+  terrariaServer: Dimensions.TerrariaServer.t,
   rawPacket: Dimensions.RawPacket.t,
 ): Dimensions.Extension.packetHandlerResult => {
   let packet = TerrariaPacket.ParserConverterV1456.convertToLatestIfNeeded(
@@ -17,6 +62,7 @@ let handlePacket = (
     AllowPacket
   | Ok(DiscardAsNotExists) => BlockPacket
   | Ok(ConvertedToLatest(packet)) =>
+    let packet = translateNpcGeneration(terrariaServer, packet)
     switch TerrariaPacket.Packet.toBuffer(packet, true) {
     | Ok(buffer) => {
         rawPacket.data = buffer
@@ -70,7 +116,7 @@ let serverPacketHandler = Dimensions.Extension.TerrariaServerPacketHandler.make(
       source,
       getClientVersion(terrariaServer.client),
     ) {
-      handlePacket(compatibilityLayer, rawPacket)
+      handlePacket(compatibilityLayer, terrariaServer, rawPacket)
     } else {
       AllowPacket
     }
