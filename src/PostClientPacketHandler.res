@@ -19,6 +19,21 @@ let blockUnsupportedNpcBuff = (rawPacket: Dimensions.RawPacket.t) => {
   }
 }
 
+let sendNpcDamageAck = (
+  compatibilityLayer: CompatibilityLayer.t,
+  client: Dimensions.Client.t,
+) => {
+  switch TerrariaPacket.Packet.DamageNPCAck.toBuffer() {
+  | Ok(buffer) => client->Dimensions.Client.sendDirect(buffer)
+  | Error({context, error}) => {
+      let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
+      compatibilityLayer.logging->Dimensions.WinstonLogger.error(
+        `Failed to encode NPC damage acknowledgement for v1.4.5.7. Error: ${err}`,
+      )
+    }
+  }
+}
+
 let handleConnectRequest = (
   compatibilityLayer: CompatibilityLayer.t,
   client,
@@ -69,6 +84,7 @@ let tryHandleVersion = (
 
 let handlePacket = (
   compatibilityLayer: CompatibilityLayer.t,
+  client: Dimensions.Client.t,
   rawPacket: Dimensions.RawPacket.t,
 ): Dimensions.Extension.packetHandlerResult => {
   try {
@@ -114,6 +130,10 @@ let handlePacket = (
         switch TerrariaPacket.PacketV1456.toBuffer(packet, false) {
         | Ok(buffer) => {
             rawPacket.data = buffer
+            switch packet {
+            | NpcStrike(_) => sendNpcDamageAck(compatibilityLayer, client)
+            | _ => ()
+            }
             AllowPacket
           }
         | NotImplemented => {
@@ -168,11 +188,11 @@ let clientPacketHandler = Dimensions.Extension.ClientPacketHandler.make((
     switch getClientVersion(client) {
     | Some(version) =>
       if Config.shouldConvertToFromClient(config, version, client.server.name) {
-        handlePacket(compatibilityLayer, rawPacket)
+        handlePacket(compatibilityLayer, client, rawPacket)
       } else {
         AllowPacket
       }
-    | None => handlePacket(compatibilityLayer, rawPacket)
+    | None => handlePacket(compatibilityLayer, client, rawPacket)
     }
   | Loading => AllowPacket
   }
