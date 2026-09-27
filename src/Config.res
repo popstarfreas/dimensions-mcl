@@ -112,7 +112,7 @@ let setupHotReload = (~onConfigReload) => {
   let hotReloadTimeout = ref(None)
   let currentPromise = ref(None)
   let watcher = FsWatch.watch(
-    relativeLocation,
+    "../configuration",
     ~listener=(_eventType, _filename) => {
       switch hotReloadTimeout.contents {
       | Some(timeout) => clearTimeout(timeout)

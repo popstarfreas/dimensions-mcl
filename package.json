@@ -1,6 +1,7 @@
 {
   "name": "dimensions-cl",
   "version": "1.0.0",
+  "packageManager": "pnpm@10.29.3",
   "main": "index.js",
   "license": "MIT",
   "scripts": {
@@ -9,7 +10,7 @@
     "esbuild": "esbuild lib/es6/src/Index.mjs --platform=node --bundle --format=esm --external:dimensions* --banner:js='import { createRequire } from \"node:module\"; const require = createRequire(import.meta.url);' --outfile=dist/index.mjs"
   },
   "dependencies": {
-    "@popstarfreas/packetfactory": "^7.0.0",
+    "@popstarfreas/packetfactory": "^7.2.3",
     "@popstarfreas/rescript-nodejs": "git+https://github.com/popstarfreas/rescript-nodejs.git#f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7",
     "@rescript/language-server": "^1.70.0",
     "@rescript/linux-x64": "12.0.0-alpha.13",
@@ -17,7 +18,7 @@
     "rescript": "^12.0.0",
     "rescript-dimensions": "../rescript-dimensions",
     "sury": "11.0.0-alpha.4",
-    "terraria-packet": "github:popstarfreas/rescript-terrariapacket#07bc77f411cefe074336ab9a17e8f6f32dfc614d",
+    "terraria-packet": "github:popstarfreas/rescript-terrariapacket#f60f9f47646a443464e1fdab2287490ca7ae7257",
     "yaml": "^2.8.2"
   },
   "devDependencies": {

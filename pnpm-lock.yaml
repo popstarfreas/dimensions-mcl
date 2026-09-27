@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@popstarfreas/packetfactory':
-        specifier: ^7.0.0
-        version: 7.2.1
+        specifier: ^7.2.3
+        version: 7.2.3
       '@popstarfreas/rescript-nodejs':
         specifier: git+https://github.com/popstarfreas/rescript-nodejs.git#f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
         version: https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
@@ -33,8 +33,8 @@ importers:
         specifier: 11.0.0-alpha.4
         version: 11.0.0-alpha.4(rescript@12.0.0)
       terraria-packet:
-        specifier: github:popstarfreas/rescript-terrariapacket#07bc77f411cefe074336ab9a17e8f6f32dfc614d
-        version: https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/07bc77f411cefe074336ab9a17e8f6f32dfc614d(rescript@12.0.0)
+        specifier: github:popstarfreas/rescript-terrariapacket#f60f9f47646a443464e1fdab2287490ca7ae7257
+        version: https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/f60f9f47646a443464e1fdab2287490ca7ae7257(rescript@12.0.0)
       yaml:
         specifier: ^2.8.2
         version: 2.8.2
@@ -183,9 +183,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@popstarfreas/packetfactory@7.2.1':
-    resolution: {integrity: sha512-gn4Z3vqKo7Y+3HshxjBT3i1m8+n/sTcsgUD+vqGdGQCBM4/iGX5W4FW5PRmYJtLoPsZY1VX3vBw0fMQCLfaaLw==}
-
   '@popstarfreas/packetfactory@7.2.3':
     resolution: {integrity: sha512-fiL/GV1QGiQJNYm+aXYUTSGoz71zv/LKt5gvv89EsBnQe0bLzrDsn+vE+cm1OEjaDb946j1pPSZ1EF7SnpWIGQ==}
 
@@ -267,8 +264,8 @@ packages:
       rescript:
         optional: true
 
-  terraria-packet@https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/07bc77f411cefe074336ab9a17e8f6f32dfc614d:
-    resolution: {tarball: https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/07bc77f411cefe074336ab9a17e8f6f32dfc614d}
+  terraria-packet@https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/f60f9f47646a443464e1fdab2287490ca7ae7257:
+    resolution: {tarball: https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/f60f9f47646a443464e1fdab2287490ca7ae7257}
     version: 1.0.0
 
   vscode-jsonrpc@8.2.0:
@@ -365,12 +362,6 @@ snapshots:
   '@esbuild/win32-x64@0.20.2':
     optional: true
 
-  '@popstarfreas/packetfactory@7.2.1':
-    dependencies:
-      '@popstarfreas/rescript-nodejs': https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
-    optionalDependencies:
-      rescript: 12.0.0
-
   '@popstarfreas/packetfactory@7.2.3':
     dependencies:
       '@popstarfreas/rescript-nodejs': https://codeload.github.com/popstarfreas/rescript-nodejs/tar.gz/f3bd284a3ef17a3fc7cc81ccb7c362b278ea66c7
@@ -453,7 +444,7 @@ snapshots:
     optionalDependencies:
       rescript: 12.0.0
 
-  terraria-packet@https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/07bc77f411cefe074336ab9a17e8f6f32dfc614d(rescript@12.0.0):
+  terraria-packet@https://codeload.github.com/popstarfreas/rescript-terrariapacket/tar.gz/f60f9f47646a443464e1fdab2287490ca7ae7257(rescript@12.0.0):
     dependencies:
       '@popstarfreas/packetfactory': 7.2.3
       '@rescript/core': 1.6.1(rescript@12.0.0)
