@@ -1,20 +1,23 @@
-# Dimensions v1.4.5.7 Compatibility Layer
-## Current State
-Considered stable but does not provide complete patching.
+# Dimensions Terraria 1.4.6 compatibility layer
 
-## How to install
-Go to releases, download the js file (its a bundle of this extension) and copy into your dimensions folder under this directory: `./build/extensions/dimensions-cl/index.mjs`
+MCL connects Terraria 1.4.6 clients (protocol 329) to selected 1.4.5.8 backend servers (protocol 326). Dimensions uses the 1.4.6 packet format internally.
 
-## How does it work?
-When a 1.4.5.7 client connects to a configured 1.4.5.6 server, the extension rewrites the handshake from protocol 325 to protocol 319 and converts changed packets in both directions.
+## Installation
 
-Set `oldVersion` to `319` in `configuration/cl.yaml`, then select the 1.4.5.6 servers with `oldServers` or `allAreOldServers`.
+Copy `dist/index.mjs` to `build/extensions/dimensions-cl/index.mjs` in the 1.4.6 Dimensions installation. Leave Dimensions’ `fakeVersion.enabled` set to `false`. Create `configuration/cl.yaml` with the names of the 1.4.5.8 routing servers.
 
-## How to build this extension
-**This repo is currently not fully buildable due to some missing deps**
+```yaml
+oldVersion: 326
+oldServers:
+  lobby: ""
+allAreOldServers: false
+hotReloadEnabled: true
+```
 
-1. Clone repo
-2. Run ``pnpm install`` in the root directory of the cloned repo
-3. Run ``pnpm rescript``
-4. Run ``pnpm esbuild``
-5. Extension File is in dist/index.mjs
+Set `allAreOldServers: true` if every backend runs 1.4.5.8. Other routes use native protocol 329. The existing 1.4.5.6 bridge can be selected with `oldVersion: 319`. One configuration selects one legacy backend version.
+
+The 326 bridge preserves NPC and projectile generations and forwards native damage acknowledgements. It uses the remaining animation time as the maximum when the backend supplies only one duration. Dropped-item width and height overrides have no equivalent in 329. MCL skips projectile-slot emotes and NPC head emotes without a matching 1.4.6 face. The new Trap Bomb projectile and protocol-329 discovery, platform, and acknowledgement packets are filtered on legacy routes.
+
+## Building
+
+With `dimensions-core` and `rescript-dimensions` in sibling directories, run `pnpm install`, `pnpm run build`, and `pnpm run esbuild`. The extension bundle is written to `dist/index.mjs`. Run `pnpm test` with Dimensions built to exercise the bundled extension.

@@ -1,46 +1,23 @@
-let formatDecodeError = (error: S.error) => {
-  `DecodeError ${error.message}.`
-}
-
-let formatException = (exn: JsExn.t) => {
-  exn->JsExn.message->Option.getOr("") ++
-  ": " ++
-  exn->JsExn.stack->Option.getOr("(no stack available)")
-}
-
 let constructor = (_extension: Dimensions.Extension.t, logging: Dimensions.WinstonLogger.t) => {
-  let compatibilityLayer = CompatibilityLayer.make(logging)
-  Config.readFromFile()
-  ->Promise.thenResolve(config => {
-    switch config {
-    | Ok(config) => {
-        compatibilityLayer.config = Loaded(config)
-        if config.hotReloadEnabled {
-          Console.log("CompatibilityLayer: Hot reloading enabled")
-          compatibilityLayer.cleanupFsWatcher = Config.setupHotReload(~onConfigReload=config => {
-            compatibilityLayer.config = Loaded(config)
-          })
-        }
-      }
-    | Error(e) => {
-        logging->Dimensions.WinstonLogger.error(formatDecodeError(e))
-        NodeJs.Process.process->NodeJs.Process.exit()
-      }
-    }
-  })
-  ->ignore
-  compatibilityLayer
+  let config = switch Config.readFromFileSync() {
+  | Ok(config) => config
+  | Error(err) => JsError.throwWithMessage(err.message)
+  }
+  let layer: CompatibilityLayer.t = {config, logging, cleanupFsWatcher: () => ()}
+  if config.hotReloadEnabled {
+    layer.cleanupFsWatcher = Config.setupHotReload(~onConfigReload=config => {
+      layer.config = config
+    })
+  }
+  layer
 }
 
 let default: Dimensions.Extension.clsOfT<CompatibilityLayer.t> = Dimensions.Extension.make(
-  ~name="Compatibility Layer 1.4.5.7 (client) -> 1.4.5.6 (server)",
+  ~name="Terraria 1.4.6 Compatibility Layer",
   ~author="popstarfreas",
-  ~version="v6.0",
+  ~version="v7.0",
   ~constructor,
-  ~priorPacketHandler={
-    serverHandler: PriorServerPacketHandler.serverPacketHandler,
-  },
-  ~postPacketHandler={
-    clientHandler: PostClientPacketHandler.clientPacketHandler,
-  },
+  ~unloadEvent=(layer, _) => layer.cleanupFsWatcher(),
+  ~priorPacketHandler={serverHandler: PriorServerPacketHandler.serverPacketHandler},
+  ~postPacketHandler={clientHandler: PostClientPacketHandler.clientPacketHandler},
 )

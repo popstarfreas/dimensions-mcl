@@ -84,29 +84,10 @@ let readFromFileSync = (): readResult => {
   }
 }
 
-let shouldConvertToFromServer = (
-  config,
-  serverName,
-  source: Dimensions.Extension.PacketSource.t,
-  clientVersion,
-) => {
-  switch clientVersion {
-  | Some(version) if version <= config.oldVersion => false
-  | _ =>
-    switch source {
-    | TerrariaServer =>
-      config.oldServers->Dict.get(String.toLowerCase(serverName))->Option.isSome ||
-        config.allAreOldServers
-    | Dimensions => false
-    }
-  }
-}
-
-let shouldConvertToFromClient = (config, version, serverName) => {
-  config.oldVersion < version &&
-    (config.oldServers->Dict.get(String.toLowerCase(serverName))->Option.isSome ||
-      config.allAreOldServers)
-}
+let shouldConvert = (config, clientVersion, serverName) =>
+  clientVersion == "Terraria329" &&
+  (config.oldVersion == 326 || config.oldVersion == 319) &&
+  (config.allAreOldServers || config.oldServers->Dict.get(String.toLowerCase(serverName))->Option.isSome)
 
 let setupHotReload = (~onConfigReload) => {
   let hotReloadTimeout = ref(None)

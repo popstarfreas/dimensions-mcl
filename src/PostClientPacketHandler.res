@@ -1,232 +1,104 @@
-@get external getClientVersion: Dimensions.Client.t => option<int> = "clVersion"
-@set external setClientVersion: (Dimensions.Client.t, int) => unit = "clVersion"
+let rememberProjectile = (client: Dimensions.Client.t, key) =>
+  ProjectileKeyTracker.forServer(client.server)->ProjectileKeyTracker.rememberClientKey(key)
 
-let serverProtocolVersion = 319
-let serverProtocolName = `Terraria${serverProtocolVersion->Int.toString}`
-// Terraria 1.4.5.6 BuffID.Count. Its NPC.AddBuff indexes buffImmune before any range check.
-let serverBuffTypeCount = 389
-
-let blockUnsupportedNpcBuff = (rawPacket: Dimensions.RawPacket.t) => {
-  let result = TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false)
+let convertFor1456 = (client: Dimensions.Client.t, rawPacket: Dimensions.RawPacket.t) => {
+  open TerrariaPacket
+  let? Ok(result) = ParserConverterV1456.convertFromLatestIfNeeded(
+    ~buffer=rawPacket.data,
+    ~fromServer=false,
+  )
   switch result {
-  | Ok(NpcBuffAdd(npcBuffAdd)) =>
-    switch Lazy.get(npcBuffAdd) {
-    | Ok(npcBuffAdd) if npcBuffAdd.buffType >= serverBuffTypeCount =>
-      Dimensions.Extension.BlockPacket
-    | Ok(_) | Error(_) => Dimensions.Extension.AllowPacket
+  | PacketStructureIsSame => Ok(Dimensions.Extension.AllowPacket)
+  | DiscardAsNotExists => Ok(BlockPacket)
+  | ConvertedFromLatest(packet) =>
+    let? Ok(action) = CompatibilityLayer.replacePacket(
+      rawPacket,
+      PacketV1456.toBuffer(packet, false),
+    )
+    switch packet {
+    | NpcStrike(_) =>
+      switch Packet.DamageNPCAck.toBuffer() {
+      | Ok(buffer) => client->Dimensions.Client.sendDirect(buffer)
+      | Error(err) => client.logging->Dimensions.WinstonLogger.error(err.context)
+      }
+    | _ => ()
     }
-  | _ => Dimensions.Extension.AllowPacket
+    Ok(action)
   }
 }
 
-let sendNpcDamageAck = (
-  compatibilityLayer: CompatibilityLayer.t,
-  client: Dimensions.Client.t,
-) => {
-  switch TerrariaPacket.Packet.DamageNPCAck.toBuffer() {
-  | Ok(buffer) => client->Dimensions.Client.sendDirect(buffer)
-  | Error({context, error}) => {
-      let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
-      compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-        `Failed to encode NPC damage acknowledgement for v1.4.5.7. Error: ${err}`,
+let convertFor1458 = (rawPacket: Dimensions.RawPacket.t) => {
+  open TerrariaPacket
+  let? Ok(result) = ParserConverterV1458.convertFromLatestIfNeeded(
+    ~buffer=rawPacket.data,
+    ~fromServer=false,
+  )
+  switch result {
+  | PacketStructureIsSame => Ok(Dimensions.Extension.AllowPacket)
+  | DiscardAsNotExists => Ok(BlockPacket)
+  | ConvertedFromLatest(packet) =>
+    CompatibilityLayer.replacePacket(rawPacket, PacketV1458.toBuffer(packet, false))
+  }
+}
+
+let handlePacket = (oldVersion, client: Dimensions.Client.t, rawPacket: Dimensions.RawPacket.t) => {
+  open TerrariaPacket
+  let forward = () =>
+    oldVersion == 319 ? convertFor1456(client, rawPacket) : convertFor1458(rawPacket)
+  switch PacketType.fromInt(rawPacket.packetType) {
+  | Some(ConnectRequest) =>
+    switch Packet.ConnectRequest.toBuffer({version: "Terraria" ++ Int.toString(oldVersion)}) {
+    | Ok(buffer) => {
+        rawPacket.data = buffer
+        Ok(Dimensions.Extension.AllowPacket)
+      }
+    | Error(err) => Error(IParser.ParseError.ReaderError({context: err.context, error: err.error}))
+    }
+  | Some(ProjectileSync) =>
+    let? Ok(packet) = Parser.parse(~buffer=rawPacket.data, ~fromServer=false)
+    switch packet {
+    // TrapBomb was added in 329. ProjectileID.Count is 1136 in 326.
+    | ProjectileSync({projectileType}) if projectileType >= 1136 => Ok(BlockPacket)
+    | ProjectileSync({projectileKey}) if oldVersion == 319 =>
+      let? Ok(action) = forward()
+      if action == AllowPacket {
+        rememberProjectile(client, projectileKey)
+      }
+      Ok(action)
+    | _ => forward()
+    }
+  | Some(ProjectileDestroy) if oldVersion == 319 =>
+    let? Ok(packet) = Parser.parse(~buffer=rawPacket.data, ~fromServer=false)
+    let? Ok(action) = forward()
+    switch packet {
+    | ProjectileDestroy({projectileKey}) if action == AllowPacket =>
+      ProjectileKeyTracker.forServer(client.server)->ProjectileKeyTracker.markClientKeyDestroyed(
+        projectileKey,
       )
+    | _ => ()
     }
-  }
-}
-
-type clientProjectileAction =
-  | RememberProjectile(TerrariaPacket.ProjectileKey.t)
-  | DestroyProjectile(TerrariaPacket.ProjectileKey.t)
-
-let getClientProjectileAction = (rawPacket: Dimensions.RawPacket.t) => {
-  switch TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false) {
-  | Ok(ProjectileSync(projectileSync)) =>
-    switch Lazy.get(projectileSync) {
-    | Ok(projectileSync) => Some(RememberProjectile(projectileSync.projectileKey))
-    | Error(_) => None
+    Ok(action)
+  | Some(NpcBuffAdd) if oldVersion == 319 =>
+    let? Ok(packet) = Parser.parse(~buffer=rawPacket.data, ~fromServer=false)
+    switch packet {
+    | NpcBuffAdd({buffType}) if buffType >= 389 => Ok(BlockPacket)
+    | _ => forward()
     }
-  | Ok(ProjectileDestroy(projectileDestroy)) =>
-    switch Lazy.get(projectileDestroy) {
-    | Ok(projectileDestroy) => Some(DestroyProjectile(projectileDestroy.projectileKey))
-    | Error(_) => None
-    }
-  | _ => None
-  }
-}
-
-let applyClientProjectileAction = (client: Dimensions.Client.t, action) => {
-  let tracker = ProjectileKeyTracker.forServer(client.server)
-  switch action {
-  | Some(RememberProjectile(projectileKey)) =>
-    tracker->ProjectileKeyTracker.rememberClientKey(projectileKey)
-  | Some(DestroyProjectile(projectileKey)) =>
-    tracker->ProjectileKeyTracker.markClientKeyDestroyed(projectileKey)
-  | None => ()
-  }
-}
-
-let handleConnectRequest = (
-  compatibilityLayer: CompatibilityLayer.t,
-  client,
-  connectRequest: TerrariaPacket.Packet.ConnectRequest.t,
-) => {
-  if getClientVersion(client)->Option.isNone {
-    let versionNumber =
-      connectRequest.version
-      ->String.substring(~start=String.length("Terraria"))
-      ->Int.fromString
-
-    switch versionNumber {
-    | Some(versionNumber) => {
-        setClientVersion(client, versionNumber)
-        Console.log2("Version number", versionNumber)
-      }
-    | None =>
-      compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-        `Failed to parse version number from client-sent ConnectRequest. Contents: { version: ${connectRequest.version} }`,
-      )
-    }
-  }
-}
-
-let tryHandleVersion = (
-  compatibilityLayer: CompatibilityLayer.t,
-  client: Dimensions.Client.t,
-  rawPacket: Dimensions.RawPacket.t,
-) => {
-  let packet = TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false)
-  switch packet {
-  | Ok(TerrariaPacket.Packet.LazyPacket.ConnectRequest(connectRequest)) =>
-    switch Lazy.get(connectRequest) {
-    | Ok(connectRequest) => handleConnectRequest(compatibilityLayer, client, connectRequest)
-    | Error({context, error}) => {
-        let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
-        compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to parse client-sent ConnectRequest packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-              rawPacket.data,
-              NodeJs.StringEncoding.hex,
-            )}`,
-        )
-      }
-    }
-  | _ => ()
-  }
-}
-
-let handlePacket = (
-  compatibilityLayer: CompatibilityLayer.t,
-  client: Dimensions.Client.t,
-  rawPacket: Dimensions.RawPacket.t,
-): Dimensions.Extension.packetHandlerResult => {
-  try {
-    let clientProjectileAction = getClientProjectileAction(rawPacket)
-    {
-      let result = TerrariaPacket.Parser.parseLazy(~buffer=rawPacket.data, ~fromServer=false)
-      switch result {
-      | Ok(ConnectRequest(connectRequest)) =>
-        switch Lazy.get(connectRequest) {
-        | Ok({version: _}) =>
-          Console.log2("Patching client protocol version to", serverProtocolVersion)
-          let buf = TerrariaPacket.Packet.ConnectRequest.toBuffer({
-            version: serverProtocolName,
-          })
-          switch buf {
-          | Ok(buf) => rawPacket.data = buf
-          | Error(err) => Console.error(err)
-          }
-        | Error({context, error}) => {
-            let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
-            compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-              `Failed to parse client-sent ConnectRequest packet. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-                  rawPacket.data,
-                  NodeJs.StringEncoding.hex,
-                )}`,
-            )
-          }
-        }
-      | _ => ()
-      }
-    }
-
-    switch blockUnsupportedNpcBuff(rawPacket) {
-    | BlockPacket => BlockPacket
-    | AllowPacket =>
-      let result = TerrariaPacket.ParserConverterV1456.convertFromLatestIfNeeded(
-        ~buffer=rawPacket.data,
-        ~fromServer=false,
-      )
-      switch result {
-      | Ok(PacketStructureIsSame) => Dimensions.Extension.AllowPacket
-      | Ok(DiscardAsNotExists) => BlockPacket
-      | Ok(ConvertedFromLatest(packet)) =>
-        switch TerrariaPacket.PacketV1456.toBuffer(packet, false) {
-        | Ok(buffer) => {
-            rawPacket.data = buffer
-            switch packet {
-            | NpcStrike(_) => sendNpcDamageAck(compatibilityLayer, client)
-            | _ => ()
-            }
-            applyClientProjectileAction(client, clientProjectileAction)
-            AllowPacket
-          }
-        | NotImplemented => {
-            compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-              `Failed to encode converted client-sent packet for v1.4.5.6. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-                  rawPacket.data,
-                  NodeJs.StringEncoding.hex,
-                )}`,
-            )
-            BlockPacket
-          }
-        | Error({context, error}) => {
-            let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
-            compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-              `Failed to encode converted client-sent packet for v1.4.5.6. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-                  rawPacket.data,
-                  NodeJs.StringEncoding.hex,
-                )}`,
-            )
-            BlockPacket
-          }
-        }
-      | Error(err) => {
-          let err = TerrariaPacket.IParser.ParseError.toDisplayString(err)
-          compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-            `Failed to convert client-sent packet from v1.4.5.7 to v1.4.5.6. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-                rawPacket.data,
-                NodeJs.StringEncoding.hex,
-              )}`,
-          )
-          BlockPacket
-        }
-      }
-    }
-  } catch {
-  | e => {
-      Console.error(e)
-      BlockPacket
-    }
+  | _ => forward()
   }
 }
 
 let clientPacketHandler = Dimensions.Extension.ClientPacketHandler.make((
-  compatibilityLayer: CompatibilityLayer.t,
+  layer: CompatibilityLayer.t,
   _: Dimensions.Extension.t,
   client,
   rawPacket,
 ) => {
-  switch compatibilityLayer.config {
-  | Loaded(config) =>
-    tryHandleVersion(compatibilityLayer, client, rawPacket)
-    switch getClientVersion(client) {
-    | Some(version) =>
-      if Config.shouldConvertToFromClient(config, version, client.server.name) {
-        handlePacket(compatibilityLayer, client, rawPacket)
-      } else {
-        AllowPacket
-      }
-    | None => handlePacket(compatibilityLayer, client, rawPacket)
-    }
-  | Loading => AllowPacket
+  if Config.shouldConvert(layer.config, client.version, client.server.name) {
+    handlePacket(layer.config.oldVersion, client, rawPacket)->CompatibilityLayer.finish(
+      layer.logging,
+    )
+  } else {
+    AllowPacket
   }
 })

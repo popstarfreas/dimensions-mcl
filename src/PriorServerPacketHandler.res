@@ -1,11 +1,9 @@
-@get external getClientVersion: Dimensions.Client.t => option<int> = "clVersion"
-@get external getNpcGenerationTracker: Dimensions.TerrariaServer.t => option<
-  NpcGenerationTracker.t,
-> = "clNpcGenerationTracker"
-@set external setNpcGenerationTracker: (
-  Dimensions.TerrariaServer.t,
-  NpcGenerationTracker.t,
-) => unit = "clNpcGenerationTracker"
+@get
+external getNpcGenerationTracker: Dimensions.TerrariaServer.t => option<NpcGenerationTracker.t> =
+  "clNpcGenerationTracker"
+@set
+external setNpcGenerationTracker: (Dimensions.TerrariaServer.t, NpcGenerationTracker.t) => unit =
+  "clNpcGenerationTracker"
 
 let npcGenerationTrackerForServer = server =>
   switch getNpcGenerationTracker(server) {
@@ -19,20 +17,21 @@ let npcGenerationTrackerForServer = server =>
 
 let npcIsActive = (npcUpdate: TerrariaPacket.Packet.NpcUpdate.t) =>
   npcUpdate.npcTypeId != 0 &&
-  switch npcUpdate.life {
-  | Max => true
-  | Byte(life) | Int16(life) | Int32(life) => life > 0
-  }
+    switch npcUpdate.life {
+    | Max => true
+    | Byte(life) | Int16(life) | Int32(life) => life > 0
+    }
 
 let translateNpcGeneration = (terrariaServer, packet: TerrariaPacket.Packet.t) => {
   let tracker = npcGenerationTrackerForServer(terrariaServer)
   switch packet {
   | NpcUpdate(npcUpdate) => {
-      let generation = tracker->NpcGenerationTracker.generationForUpdate(
-        ~slotId=npcUpdate.npcSlotId,
-        ~active=npcIsActive(npcUpdate),
-        ~forceNew=npcUpdate.spawnNeedsSyncing,
-      )
+      let generation =
+        tracker->NpcGenerationTracker.generationForUpdate(
+          ~slotId=npcUpdate.npcSlotId,
+          ~active=npcIsActive(npcUpdate),
+          ~forceNew=npcUpdate.spawnNeedsSyncing,
+        )
       TerrariaPacket.Packet.NpcUpdate({...npcUpdate, generation})
     }
   | NpcStrike(npcStrike) =>
@@ -49,103 +48,71 @@ let translateProjectileKey = (terrariaServer, packet: TerrariaPacket.Packet.t) =
   switch packet {
   | ProjectileSync(projectileSync) => {
       let convertedKey = projectileSync.projectileKey
-      let projectileKey = tracker->ProjectileKeyTracker.keyForSync(
-        ~spawner=convertedKey.spawner,
-        ~index=convertedKey.index,
-        ~preferredGeneration=convertedKey.generation,
-      )
+      let projectileKey =
+        tracker->ProjectileKeyTracker.keyForSync(
+          ~spawner=convertedKey.spawner,
+          ~index=convertedKey.index,
+          ~preferredGeneration=convertedKey.generation,
+        )
       TerrariaPacket.Packet.ProjectileSync({...projectileSync, projectileKey})
     }
   | ProjectileDestroy(projectileDestroy) => {
       let convertedKey = projectileDestroy.projectileKey
-      let projectileKey = tracker->ProjectileKeyTracker.keyForDestroy(
-        ~spawner=convertedKey.spawner,
-        ~index=convertedKey.index,
-        ~preferredGeneration=convertedKey.generation,
-      )
+      let projectileKey =
+        tracker->ProjectileKeyTracker.keyForDestroy(
+          ~spawner=convertedKey.spawner,
+          ~index=convertedKey.index,
+          ~preferredGeneration=convertedKey.generation,
+        )
       TerrariaPacket.Packet.ProjectileDestroy({...projectileDestroy, projectileKey})
     }
   | packet => packet
   }
 }
 
-let handlePacket = (
-  compatibilityLayer: CompatibilityLayer.t,
-  terrariaServer: Dimensions.TerrariaServer.t,
-  rawPacket: Dimensions.RawPacket.t,
-): Dimensions.Extension.packetHandlerResult => {
-  let packet = TerrariaPacket.ParserConverterV1456.convertToLatestIfNeeded(
-    ~buffer=rawPacket.data,
-    ~fromServer=true,
-  )
-  switch packet {
-  | Ok(PacketStructureIsSame) =>
-    /* let packetType =
-        TerrariaPacket.PacketType.fromInt(Obj.magic(rawPacket.packetType))
-        ->Option.map(p => TerrariaPacket.PacketType.packetName(p))
-        ->Option.getOr("Unknown")*/
-    AllowPacket
-  | Ok(DiscardAsNotExists) => BlockPacket
-  | Ok(ConvertedToLatest(packet)) =>
-    let packet = translateNpcGeneration(terrariaServer, packet)
-    let packet = translateProjectileKey(terrariaServer, packet)
-    switch TerrariaPacket.Packet.toBuffer(packet, true) {
-    | Ok(buffer) => {
-        rawPacket.data = buffer
-        AllowPacket
-      }
-    | NotImplemented => {
-        compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to encode converted server-sent packet for v1.4.5.7. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-              rawPacket.data,
-              NodeJs.StringEncoding.hex,
-            )}`,
-        )
-        BlockPacket
-      }
-    | Error({context, error}) => {
-        let err = `context: ${context}, error: ${JsExn.message(error)->Option.getOr("unknown")}`
-        compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-          `Failed to encode converted server-sent packet for v1.4.5.7. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-              rawPacket.data,
-              NodeJs.StringEncoding.hex,
-            )}`,
-        )
-        BlockPacket
-      }
+let handlePacket = (oldVersion, server, rawPacket: Dimensions.RawPacket.t) => {
+  open TerrariaPacket
+  if oldVersion == 319 {
+    let? Ok(result) = ParserConverterV1456.convertToLatestIfNeeded(
+      ~buffer=rawPacket.data,
+      ~fromServer=true,
+    )
+    switch result {
+    | PacketStructureIsSame => Ok(Dimensions.Extension.AllowPacket)
+    | DiscardAsNotExists => Ok(BlockPacket)
+    | ConvertedToLatest(packet) =>
+      let packet = translateProjectileKey(server, translateNpcGeneration(server, packet))
+      CompatibilityLayer.replacePacket(rawPacket, Packet.toBuffer(packet, true))
     }
-  | Error(err) => {
-      let err = TerrariaPacket.IParser.ParseError.toDisplayString(err)
-      compatibilityLayer.logging->Dimensions.WinstonLogger.error(
-        `Failed to convert server-sent packet from v1.4.5.6 to v1.4.5.7. Error: ${err}. Packet: ${NodeJs.Buffer.toStringWithEncoding(
-            rawPacket.data,
-            NodeJs.StringEncoding.hex,
-          )}`,
-      )
-      BlockPacket
+  } else {
+    let? Ok(result) = ParserConverterV1458.convertToLatestIfNeeded(
+      ~buffer=rawPacket.data,
+      ~fromServer=true,
+    )
+    switch result {
+    | PacketStructureIsSame => Ok(Dimensions.Extension.AllowPacket)
+    | DiscardAsNotExists => Ok(BlockPacket)
+    | ConvertedToLatest(packet) =>
+      CompatibilityLayer.replacePacket(rawPacket, Packet.toBuffer(packet, true))
     }
   }
 }
 
 let serverPacketHandler = Dimensions.Extension.TerrariaServerPacketHandler.make((
-  compatibilityLayer: CompatibilityLayer.t,
+  layer: CompatibilityLayer.t,
   _: Dimensions.Extension.t,
-  terrariaServer,
+  server,
   rawPacket,
   source,
 ) => {
-  switch compatibilityLayer.config {
-  | Loaded(config) =>
-    if Config.shouldConvertToFromServer(
-      config,
-      terrariaServer.name,
-      source,
-      getClientVersion(terrariaServer.client),
-    ) {
-      handlePacket(compatibilityLayer, terrariaServer, rawPacket)
-    } else {
-      AllowPacket
-    }
-  | Loading => AllowPacket
+  if (
+    source == TerrariaServer &&
+      Config.shouldConvert(layer.config, server.client.version, server.name)
+  ) {
+    handlePacket(layer.config.oldVersion, server, rawPacket)->CompatibilityLayer.finish(
+      layer.logging,
+    )
+  } else {
+    AllowPacket
   }
 })
